@@ -1,8 +1,13 @@
 Experiments in compiling a dependently typed language to the JVM
 
+Try it out:
+```
+sbt "run examples/Test"
+```
+
 TODO:
-- [ ] Surface syntax
-- [ ] Parsing
+- [x] Surface syntax
+- [x] Parsing
 - [ ] Core syntax
 - [ ] Values
 - [ ] Evaluation
