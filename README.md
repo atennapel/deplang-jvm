@@ -8,11 +8,11 @@ sbt "run examples/Test"
 TODO:
 - [x] Surface syntax
 - [x] Parsing
-- [ ] Core syntax
-- [ ] Values
-- [ ] Evaluation
-- [ ] Conversion checking
-- [ ] Typechecking
+- [x] Core syntax
+- [x] Values
+- [x] Evaluation
+- [x] Unification
+- [ ] Elaboration
 - [ ] Pretty printing
 - [ ] IR syntax
 - [ ] Bytecode generation
