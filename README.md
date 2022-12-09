@@ -12,7 +12,8 @@ TODO:
 - [x] Values
 - [x] Evaluation
 - [x] Unification
-- [ ] Elaboration
+- [x] Globals
+- [x] Elaboration
 - [ ] Pretty printing
 - [ ] IR syntax
 - [ ] Bytecode generation

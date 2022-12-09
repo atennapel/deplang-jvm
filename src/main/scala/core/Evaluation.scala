@@ -1,6 +1,7 @@
 package core
 
 import common.Common.*
+import common.Globals.getGlobal
 import Syntax.*
 import Value.*
 
@@ -10,12 +11,17 @@ object Evaluation:
   def vapp(f: Val, a: Val): Val = f match
     case VLam(_, b)        => b(a)
     case VRigid(hd, sp)    => VRigid(hd, a :: sp)
-    case VGlobal(x, sp, v) => VGlobal(x, a :: sp, () => vapp(f, v()))
+    case VGlobal(x, sp, v) => VGlobal(x, a :: sp, () => vapp(v(), a))
     case _                 => impossible()
 
   def eval(tm: Tm)(implicit env: Env): Val = tm match
-    case Local(ix)       => env(ix.expose)
-    case Global(x)       => VGlobal(x, Nil, () => ???) // TODO
+    case Local(ix) => env(ix.expose)
+    case Global(x) =>
+      getGlobal(x) match
+        case Some(e) =>
+          val value = e.value
+          VGlobal(x, Nil, () => value)
+        case None => impossible()
     case Let(_, _, v, b) => eval(b)(eval(v) :: env)
 
     case Type => VType
@@ -29,9 +35,10 @@ object Evaluation:
     case UnfoldAll
   export Unfold.*
 
-  def force(v: Val, unfold: Unfold = UnfoldAll): Val = v match
-    case VGlobal(_, _, v) if unfold == UnfoldAll => force(v(), UnfoldAll)
-    case v                                       => v
+  def force(v: Val, unfold: Unfold = UnfoldAll): Val =
+    v match
+      case VGlobal(_, _, v) if unfold == UnfoldAll => force(v(), UnfoldAll)
+      case v                                       => v
 
   private def quote(hd: Tm, sp: Spine, unfold: Unfold)(implicit k: Lvl): Tm =
     sp match

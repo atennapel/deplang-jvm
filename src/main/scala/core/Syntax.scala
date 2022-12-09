@@ -16,7 +16,7 @@ object Syntax:
     case App(fn: Tm, arg: Tm)
 
     override def toString: String = this match
-      case Local(x)        => s"$x"
+      case Local(x)        => s"'$x"
       case Global(x)       => s"$x"
       case Let(x, t, v, b) => s"(let $x : $t = $v in $b)"
 

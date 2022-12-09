@@ -34,6 +34,10 @@ object Syntax:
       case Hole(None)    => "_"
 
       case Pos(_, t) => s"$t"
+
+    def isPos: Boolean = this match
+      case Pos(_, t) => true
+      case _         => false
   export Tm.*
 
   final case class Defs(defs: List[Def]):
