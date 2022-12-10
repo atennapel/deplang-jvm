@@ -1,0 +1,14 @@
+Nat = (A : Type) -> A -> (A -> A) -> A;
+
+Z : Nat = \A z s. z;
+S : Nat -> Nat = \n A z s. s (n A z s);
+
+(+) : Nat -> Nat -> Nat = \a b. a Nat b S;
+
+Id : (A : Type) -> A -> A -> Type =
+  \A x y. (P : A -> Type) -> P x -> P y;
+
+Refl : (A : Type) (x : A) -> Id A x x =
+  \A x P y. y;
+
+proof : Id Nat (1 + 2) 3 = Refl Nat 3;

@@ -35,4 +35,4 @@ metals.sbt
 *.class
 *.java
 *.bc
-Test.lang
+./Test.lang
