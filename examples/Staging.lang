@@ -1,0 +1,7 @@
+id1 : (A : Type) -> A -> A = \A x. x;
+
+id : Nat -> Nat := \x. x;
+
+test1 ::= id 3;
+test2 = id1 Nat 3;
+test3 ::= id1 Nat 3;

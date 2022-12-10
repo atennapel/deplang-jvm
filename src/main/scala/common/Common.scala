@@ -57,3 +57,24 @@ object Common:
       case DoBind(x) => DoBind(x.fresh)
       case DontBind  => DontBind
   export Bind.*
+
+  // stages
+  enum Rep:
+    case RVal
+    case RFun
+    case RErased
+
+    override def toString: String = this match
+      case RVal    => "Val"
+      case RFun    => "Fun"
+      case RErased => "Erased"
+  export Rep.*
+
+  enum Stage:
+    case S0(rep: Rep)
+    case S1
+
+    def split[A](s0: Rep => A, s1: A): A = this match
+      case S1      => s1
+      case S0(rep) => s0(rep)
+  export Stage.*

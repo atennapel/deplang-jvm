@@ -2,6 +2,7 @@ import common.Debug.setDebug
 import surface.Parser.parser
 import surface.Elaboration.elaborate
 import core.Pretty.pretty
+import core.Staging.stage
 
 import java.io.File
 import scala.io.Source
@@ -16,3 +17,6 @@ object Main:
     val ds = parser.parseFromFile(new File(filename)).flatMap(_.toTry).get
     val cds = elaborate(ds)
     println(pretty(cds)(Nil))
+    println("staging:")
+    val sds = stage(cds)
+    println(pretty(sds)(Nil))

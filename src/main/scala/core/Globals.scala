@@ -16,7 +16,8 @@ object Globals:
       tm: Tm,
       ty: Ty,
       value: Val,
-      vty: VTy
+      vty: VTy,
+      stage: Stage
   )
 
   def setGlobal(entry: GlobalEntry): Unit = map.put(entry.name, entry)
