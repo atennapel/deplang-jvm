@@ -1,9 +1,8 @@
-package common
+package core
 
-import Common.*
-import surface.Syntax as S
-import core.Syntax.{Tm, Ty}
-import core.Value.{Val, VTy}
+import common.Common.*
+import Syntax.{Tm, Ty}
+import Value.{Val, VTy}
 
 import scala.collection.mutable
 

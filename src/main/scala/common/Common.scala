@@ -34,6 +34,9 @@ object Common:
 
     def expose: String = x
 
+    def fresh(implicit ns: List[Name]): Name =
+      if ns.contains(this) then Name(s"${x}'").fresh else this
+
   enum Bind:
     case DontBind
     case DoBind(name: Name)
@@ -49,4 +52,8 @@ object Common:
     def toSet: Set[Name] = this match
       case DontBind  => Set.empty
       case DoBind(x) => Set(x)
+
+    def fresh(implicit ns: List[Name]): Bind = this match
+      case DoBind(x) => DoBind(x.fresh)
+      case DontBind  => DontBind
   export Bind.*

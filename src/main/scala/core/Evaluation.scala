@@ -1,7 +1,7 @@
 package core
 
 import common.Common.*
-import common.Globals.getGlobal
+import Globals.getGlobal
 import Syntax.*
 import Value.*
 

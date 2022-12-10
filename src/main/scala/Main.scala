@@ -1,6 +1,7 @@
 import common.Debug.setDebug
 import surface.Parser.parser
 import surface.Elaboration.elaborate
+import core.Pretty.pretty
 
 import java.io.File
 import scala.io.Source
@@ -13,6 +14,5 @@ object Main:
     if !filename.endsWith(".lang") then filename = s"$filename0.lang"
     val moduleName = filename.dropRight(5)
     val ds = parser.parseFromFile(new File(filename)).flatMap(_.toTry).get
-    println(ds)
     val cds = elaborate(ds)
-    println(cds)
+    println(pretty(cds)(Nil))

@@ -14,6 +14,6 @@ TODO:
 - [x] Unification
 - [x] Globals
 - [x] Elaboration
-- [ ] Pretty printing
+- [x] Pretty printing
 - [ ] IR syntax
 - [ ] Bytecode generation

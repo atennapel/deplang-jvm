@@ -1,12 +1,12 @@
 package surface
 
 import common.Common.*
-import common.Globals.*
 import common.Debug.*
 import core.Syntax.*
 import core.Value.*
 import core.Evaluation.*
 import core.Unification.{unify as unify0, UnifyError}
+import core.Globals.*
 import Ctx.*
 import Syntax as S
 
@@ -18,7 +18,7 @@ object Elaboration:
     catch
       case e: UnifyError =>
         throw ElaborateError(
-          s"cannot unify: ${ctx.quote(a)} ~ ${ctx.quote(b)}: ${e.msg}" // TODO: pretty
+          s"cannot unify: ${ctx.pretty(a)} ~ ${ctx.pretty(b)}: ${e.msg}"
         )
 
   private def inferValue(v: S.Tm, t: Option[S.Ty])(implicit
@@ -34,12 +34,12 @@ object Elaboration:
       (etm, ety, vty)
 
   private def check(tm: S.Tm, ty: VTy)(implicit ctx: Ctx): Tm =
-    if !tm.isPos then debug(s"check $tm : ${ctx.quote(ty)}")
+    if !tm.isPos then debug(s"check $tm : ${ctx.pretty(ty)}")
     (tm, force(ty)) match
       case (S.Pos(pos, tm), _) => check(tm, ty)(ctx.enter(pos))
       case (S.Hole(x), _) =>
         throw ElaborateError(
-          s"hole found _${x.getOrElse("")} : ${ctx.quote(ty)}"
+          s"hole found _${x.getOrElse("")} : ${ctx.pretty(ty)}"
         )
       case (S.Lam(x, b), VPi(_, t, rt)) =>
         val eb = check(b, rt(VVar(ctx.lvl)))(ctx.bind(x, t))
@@ -81,7 +81,7 @@ object Elaboration:
             (App(ef, ea), b(ctx.eval(ea)))
           case _ =>
             throw ElaborateError(
-              s"pi expected in $tm but got: ${ctx.quote(fty)}"
+              s"pi expected in $tm but got: ${ctx.pretty(fty)}"
             )
       case _ => throw ElaborateError(s"cannot infer $tm")
 
