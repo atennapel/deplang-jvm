@@ -1,0 +1,11 @@
+Nat1 = (A : Type1) -> A -> (A -> A) -> A;
+Z1 : Nat1 = \A z s. z;
+S1 : Nat1 -> Nat1 = \n A z s. s (n A z s);
+foldNat1 : (A : Type1) -> Nat1 -> A -> (A -> A) -> A = \A n z s. n A z s;
+
+(*) : Nat -> Nat -> Nat := \a b. a;
+
+pow : Nat1 -> Nat -> Nat =
+  \n m. foldNat1 Nat n 1 (\n. m * n);
+
+test : Nat -> Nat := \n. pow (S1 (S1 Z1)) n

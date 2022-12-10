@@ -9,9 +9,10 @@ object Unification:
   final case class UnifyError(msg: String) extends Exception(msg)
 
   private def unify(a: Spine, b: Spine)(implicit k: Lvl): Unit = (a, b) match
-    case (Nil, Nil)             => ()
-    case (a1 :: sp1, a2 :: sp2) => unify(sp1, sp2); unify(a1, a2)
-    case _                      => throw UnifyError("spine mismatch")
+    case (SId, SId)                     => ()
+    case (SApp(sp1, a1), SApp(sp2, a2)) => unify(sp1, sp2); unify(a1, a2)
+    case (SSplice(sp1), SSplice(sp2))   => unify(sp1, sp2)
+    case _                              => throw UnifyError("spine mismatch")
 
   private def unify(a: Clos, b: Clos)(implicit k: Lvl): Unit =
     val v = VVar(k); unify(a(v), b(v))
@@ -19,10 +20,14 @@ object Unification:
   def unify(a: Val, b: Val)(implicit k: Lvl): Unit =
     debug(s"unify ${quote(a)} ~ ${quote(b)}")
     (force(a, UnfoldNone), force(b, UnfoldNone)) match
-      case (VType, VType) => ()
-
-      case (VPi(_, t1, b1), VPi(_, t2, b2)) => unify(t1, t2); unify(b1, b2)
-
+      case (VType(s1), VType(s2)) if s1 == s2 => ()
+      case (VNat, VNat)                       => ()
+      case (VZ, VZ)                           => ()
+      case (VS(n), VS(m))                     => unify(n, m)
+      case (VLift(_, a), VLift(_, b))         => unify(a, b)
+      case (VQuote(a), VQuote(b))             => unify(a, b)
+      case (VPi(_, t1, _, b1), VPi(_, t2, _, b2)) =>
+        unify(t1, t2); unify(b1, b2)
       case (VRigid(h1, sp1), VRigid(h2, sp2)) if h1 == h2 => unify(sp1, sp2)
 
       case (VLam(_, b1), VLam(_, b2)) => unify(b1, b2)

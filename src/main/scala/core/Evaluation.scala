@@ -10,8 +10,19 @@ object Evaluation:
 
   def vapp(f: Val, a: Val): Val = f match
     case VLam(_, b)        => b(a)
-    case VRigid(hd, sp)    => VRigid(hd, a :: sp)
-    case VGlobal(x, sp, v) => VGlobal(x, a :: sp, () => vapp(v(), a))
+    case VRigid(hd, sp)    => VRigid(hd, SApp(sp, a))
+    case VGlobal(x, sp, v) => VGlobal(x, SApp(sp, a), () => vapp(v(), a))
+    case _                 => impossible()
+
+  def vquote(v: Val): Val = v match
+    case VRigid(hd, SSplice(sp))     => VRigid(hd, sp)
+    case VGlobal(hd, SSplice(sp), v) => VGlobal(hd, sp, () => vquote(v()))
+    case v                           => VQuote(v)
+
+  def vsplice(v: Val): Val = v match
+    case VQuote(v)         => v
+    case VRigid(hd, sp)    => VRigid(hd, SSplice(sp))
+    case VGlobal(x, sp, v) => VGlobal(x, SSplice(sp), () => vsplice(v()))
     case _                 => impossible()
 
   def eval(tm: Tm)(implicit env: Env): Val = tm match
@@ -20,15 +31,25 @@ object Evaluation:
       getGlobal(x) match
         case Some(e) =>
           val value = e.value
-          VGlobal(x, Nil, () => value)
+          VGlobal(x, SId, () => value)
         case None => impossible()
-    case Let(_, _, v, b) => eval(b)(eval(v) :: env)
+    case Let(_, _, _, v, b) => eval(b)(eval(v) :: env)
 
-    case Type => VType
+    case Type(s) => VType(s)
 
-    case Pi(x, t, b) => VPi(x, eval(t), Clos(b))
-    case Lam(x, b)   => VLam(x, Clos(b))
-    case App(f, a)   => vapp(eval(f), eval(a))
+    case Pi(x, t, st, b) => VPi(x, eval(t), st, Clos(b))
+    case Lam(x, b)       => VLam(x, Clos(b))
+    case App(f, a)       => vapp(eval(f), eval(a))
+
+    case Lift(rep, t) => VLift(rep, eval(t))
+    case Quote(t)     => vquote(eval(t))
+    case Splice(t)    => vsplice(eval(t))
+
+    case Wk(t) => eval(t)(env.tail)
+
+    case Nat  => VNat
+    case Z    => VZ
+    case S(n) => VS(eval(n))
 
   enum Unfold:
     case UnfoldNone
@@ -42,8 +63,9 @@ object Evaluation:
 
   private def quote(hd: Tm, sp: Spine, unfold: Unfold)(implicit k: Lvl): Tm =
     sp match
-      case Nil     => hd
-      case a :: sp => App(quote(hd, sp, unfold), quote(a, unfold))
+      case SId         => hd
+      case SApp(sp, a) => App(quote(hd, sp, unfold), quote(a, unfold))
+      case SSplice(sp) => Splice(quote(hd, sp, unfold))
 
   private def quote(b: Clos, unfold: Unfold)(implicit k: Lvl): Tm =
     quote(b(VVar(k)), unfold)(k + 1)
@@ -53,9 +75,16 @@ object Evaluation:
       case VRigid(hd, sp)    => quote(Local(hd.toIx), sp, unfold)
       case VGlobal(x, sp, v) => quote(Global(x), sp, unfold)
 
-      case VType => Type
+      case VType(s) => Type(s)
 
-      case VPi(x, t, b) => Pi(x, quote(t, unfold), quote(b, unfold))
-      case VLam(x, b)   => Lam(x, quote(b, unfold))
+      case VPi(x, t, st, b) => Pi(x, quote(t, unfold), st, quote(b, unfold))
+      case VLam(x, b)       => Lam(x, quote(b, unfold))
+
+      case VLift(rep, v) => Lift(rep, quote(v, unfold))
+      case VQuote(v)     => Quote(quote(v, unfold))
+
+      case VNat  => Nat
+      case VZ    => Z
+      case VS(n) => S(quote(n, unfold))
 
   def nf(tm: Tm)(implicit env: Env = Nil): Tm = quote(eval(tm))(mkLvl(env.size))
