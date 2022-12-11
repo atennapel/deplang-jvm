@@ -101,7 +101,9 @@ object Elaboration:
       (force(a), force(b)) match
         case (VPi(x1, a1, rst1, b1), VPi(x2, a2, rst2, b2)) =>
           val ctx2 = ctx.bind(x1, a2, st2)
-          val coev0 = go(Local(ix0), a2, st2, a1, st1)(ctx2)
+          val std1 = rst1.split(_ => S0(RVal), S1)
+          val std2 = rst2.split(_ => S0(RVal), S1)
+          val coev0 = go(Local(ix0), a2, std2, a1, std1)(ctx2)
           coev0 match
             case None =>
               val body = go(
@@ -169,8 +171,8 @@ object Elaboration:
         tQuote(check(t, ty, S0(rep)))
 
       case (S.Let(x, st2, ot, v, b), _) if st2 == st =>
-        val (ev, et, vt) = inferValue(v, ot, st)
-        val eb = check(b, ty, st)(ctx.define(x, vt, st, ctx.eval(ev)))
+        val (ev, et, vt) = inferValue(v, ot, st2)
+        val eb = check(b, ty, st)(ctx.define(x, vt, st2, ctx.eval(ev)))
         Let(x, st, et, ev, eb)
 
       case (tm, _) =>
@@ -243,8 +245,8 @@ object Elaboration:
               case None    => throw ElaborateError(s"undefined variable $x")
       case S.Let(x, st, t, v, b) =>
         val (ev, et, vt) = inferValue(v, t, st)
-        val (eb, rty) = infer(b, st)(ctx.define(x, vt, st, ctx.eval(ev)))
-        (Let(x, st, et, ev, eb), rty, st)
+        val (eb, rty, st2) = infer(b)(ctx.define(x, vt, st, ctx.eval(ev)))
+        (Let(x, st, et, ev, eb), rty, st2)
       case S.Pi(x, t, b) =>
         val (et, st1) = inferType(t)
         val (eb, st2) = st1 match

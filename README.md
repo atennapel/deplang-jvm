@@ -1,4 +1,5 @@
-Experiments in compiling a dependently typed language to the JVM
+Experimental implementation of a "dysfunctional programming".
+The idea originates from this presentation by Andras Kovacs: https://www.youtube.com/watch?v=ai4vU1Naopk .
 
 Try it out:
 ```

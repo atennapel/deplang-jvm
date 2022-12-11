@@ -1,0 +1,3 @@
+test :=
+  let f : (Nat -> Nat -> Nat) := (\x y. x) in
+  f 0;
