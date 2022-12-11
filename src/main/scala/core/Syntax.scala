@@ -15,6 +15,11 @@ object Syntax:
     case Lam(name: Bind, body: Tm)
     case App(fn: Tm, arg: Tm)
 
+    case PairTy(fst: Ty, snd: Ty)
+    case Pair(fst: Tm, snd: Tm)
+    case Fst(tm: Tm)
+    case Snd(tm: Tm)
+
     case Lift(rep: Rep, tm: Ty)
     case Quote(tm: Tm)
     case Splice(tm: Tm)
@@ -40,6 +45,11 @@ object Syntax:
       case Pi(DoBind(x), t, _, b) => s"(($x : $t) -> $b)"
       case Lam(x, b)              => s"(\\$x. $b)"
       case App(f, a)              => s"($f $a)"
+
+      case PairTy(fst, snd) => s"($fst ** $snd)"
+      case Pair(fst, snd)   => s"($fst, $snd)"
+      case Fst(t)           => s"(fst $t)"
+      case Snd(t)           => s"(snd $t)"
 
       case Lift(_, t) => s"^$t"
       case Quote(t)   => s"`$t"

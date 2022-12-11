@@ -31,6 +31,10 @@ object Staging:
     case VPi0(name: Bind, rep: Rep, ty: Val0, body: Val0 => Val0)
     case VLam0(name: Bind, body: Val0 => Val0)
     case VLet0(name: Name, rep: Rep, ty: Val0, value: Val0, body: Val0 => Val0)
+    case VPairTy0(fst: Val0, snd: Val0)
+    case VPair0(fst: Val0, snd: Val0)
+    case VFst0(tm: Val0)
+    case VSnd0(tm: Val0)
     case VType0(rep: Rep)
     case VNat0
     case VZ0
@@ -63,6 +67,11 @@ object Staging:
     case Pi(x, t, st, b) => VType1
     case Lam(x, b)       => VLam1(v => eval1Bind(b, v))
     case App(f, a)       => vapp1(eval1(f), eval1(a))
+
+    case PairTy(_, _) => impossible()
+    case Pair(_, _)   => impossible()
+    case Fst(_)       => impossible()
+    case Snd(_)       => impossible()
 
     case Lift(rep, t) => VType1
     case Quote(t)     => VQuote(eval0(t))
@@ -105,6 +114,11 @@ object Staging:
     case Lam(x, b)            => VLam0(x, v => eval0Bind(b, v))
     case App(f, a)            => VApp0(eval0(f), eval0(a))
 
+    case PairTy(fst, snd) => VPairTy0(eval0(fst), eval0(snd))
+    case Pair(fst, snd)   => VPair0(eval0(fst), eval0(snd))
+    case Fst(t)           => VFst0(eval0(t))
+    case Snd(t)           => VSnd0(eval0(t))
+
     case Lift(rep, t) => impossible()
     case Quote(t)     => impossible()
     case Splice(t)    => vsplice(eval1(t))
@@ -115,21 +129,6 @@ object Staging:
     case Z          => VZ0
     case S(n)       => VS0(eval0(n))
     case FoldNat(t) => VFoldNat0(eval0(t))
-
-  private def quote0(v: Val0)(implicit k: Lvl): Tm = v match
-    case VVar0(l)    => Local(l.toIx)
-    case VGlobal0(x) => Global(x)
-    case VApp0(f, a) => App(quote0(f), quote0(a))
-    case VPi0(x, rep, t, b) =>
-      Pi(x, quote0(t), S0(rep), quote0(b(VVar0(k)))(k + 1))
-    case VLam0(x, b) => Lam(x, quote0(b(VVar0(k)))(k + 1))
-    case VLet0(x, rep, t, v, b) =>
-      Let(x, S0(rep), quote0(t), quote0(v), quote0(b(VVar0(k)))(k + 1))
-    case VType0(rep)        => Type(S0(rep))
-    case VNat0              => Nat
-    case VZ0                => Z
-    case VS0(n: Val0)       => S(quote0(n))
-    case VFoldNat0(t: Val0) => FoldNat(quote0(t))
 
   private def quote0ir(v: Val0)(implicit k: Lvl): IR.Tm = v match
     case VVar0(l)           => IR.Local(l.toIx)
@@ -144,11 +143,15 @@ object Staging:
     case VZ0                => IR.Z
     case VS0(n: Val0)       => IR.S(quote0ir(n))
     case VFoldNat0(t: Val0) => IR.FoldNat(quote0ty(t))
+    case VPair0(fst, snd)   => IR.Pair(quote0ir(fst), quote0ir(snd))
+    case VFst0(t)           => IR.Fst(quote0ir(t))
+    case VSnd0(t)           => IR.Snd(quote0ir(t))
     case _                  => impossible()
 
   private def quote0ty(v: Val0)(implicit k: Lvl): IR.Ty = v match
-    case VNat0 => IR.TNat
-    case _     => impossible()
+    case VNat0              => IR.TNat
+    case VPairTy0(fst, snd) => IR.TPair(quote0ty(fst), quote0ty(snd))
+    case _                  => impossible()
 
   private def quote0fun(v: Val0)(implicit k: Lvl): IR.TFun = v match
     case VPi0(_, RVal, t, b) =>
@@ -156,10 +159,6 @@ object Staging:
     case VPi0(_, RFun, t, b) =>
       IR.TFun(quote0ty(t), Right(quote0fun(b(VVar0(k)))(k + 1)))
     case _ => impossible()
-
-  private def stage(tm: Tm): Tm =
-    debug(s"stage $tm")
-    quote0(eval0(tm)(Empty))(lvl0)
 
   private def stageIR(tm: Tm): IR.Tm =
     debug(s"stageIR $tm")

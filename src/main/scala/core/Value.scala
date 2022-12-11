@@ -18,6 +18,8 @@ object Value:
     case SApp(spine: Spine, arg: Val)
     case SSplice(spine: Spine)
     case SFoldNat(spine: Spine, ty: VTy, z: Val, s: Val)
+    case SFst(spine: Spine)
+    case SSnd(spine: Spine)
   export Spine.*
 
   type VTy = Val
@@ -29,6 +31,9 @@ object Value:
 
     case VPi(name: Bind, ty: VTy, stage: Stage, body: Clos)
     case VLam(name: Bind, body: Clos)
+
+    case VPairTy(fst: VTy, snd: VTy)
+    case VPair(fst: Val, snd: Val)
 
     case VLift(rep: Rep, tm: VTy)
     case VQuote(tm: Val)

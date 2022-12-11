@@ -52,6 +52,10 @@ object Pretty:
     case Nat               => pretty(tm)
     case Z                 => pretty(tm)
     case FoldNat(t) if app => pretty(tm)
+    case PairTy(_, _)      => pretty(tm)
+    case Pair(_, _)        => pretty(tm)
+    case Fst(_)            => pretty(tm)
+    case Snd(_)            => pretty(tm)
     case Wk(t)             => prettyParen(t, app)(ns.tail)
     case _                 => s"(${pretty(tm)})"
 
@@ -71,6 +75,11 @@ object Pretty:
     case Pi(_, _, _, _) => prettyPi(tm)
     case Lam(_, _)      => prettyLam(tm)
     case App(_, _)      => prettyApp(tm)
+
+    case PairTy(fst, snd) => s"($fst ** $snd)"
+    case Pair(fst, snd)   => s"($fst, $snd)"
+    case Fst(t)           => s"(fst $t)"
+    case Snd(t)           => s"(snd $t)"
 
     case Lift(_, t) => s"^${prettyParen(t)}"
     case Quote(t)   => s"`${prettyParen(t)}"

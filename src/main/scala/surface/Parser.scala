@@ -32,7 +32,8 @@ object Parser:
         "in",
         "def"
       ),
-      operators = Set("=", ":=", "::=", ":", "\\", ".", "->", "^", "`", "$"),
+      operators =
+        Set("=", ":=", "::=", ":", "\\", ".", ",", "->", "**", "^", "`", "$"),
       identStart = Predicate(_.isLetter),
       identLetter =
         Predicate(c => c.isLetterOrDigit || c == '_' || c == '\'' || c == '-'),
@@ -86,6 +87,8 @@ object Parser:
       ("^" *> atom).map(t => Lift(t)) <|>
         ("`" *> atom).map(t => Quote(t)) <|>
         ("$" *> atom).map(t => Splice(t)) <|>
+        attempt("(" *> tm <~> "**" *> tm <* ")").map(PairTy.apply) <|>
+        attempt("(" *> tm <~> "," *> tm <* ")").map(Pair.apply) <|>
         ("(" *> (userOp.map(Var.apply) <|> tm) <* ")") <|>
         holeP <|>
         "Type1" #> Type(S1) <|>

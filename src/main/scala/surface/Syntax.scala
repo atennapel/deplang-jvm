@@ -14,6 +14,9 @@ object Syntax:
     case Lam(name: Bind, body: Tm)
     case App(fn: Tm, arg: Tm)
 
+    case PairTy(fst: Ty, snd: Ty)
+    case Pair(fst: Tm, snd: Tm)
+
     case Lift(tm: Ty)
     case Quote(tm: Tm)
     case Splice(tm: Tm)
@@ -42,6 +45,9 @@ object Syntax:
       case Quote(t)  => s"`$t"
       case Splice(t) => s"$$$t"
 
+      case PairTy(fst, snd) => s"($fst ** $snd)"
+      case Pair(fst, snd)   => s"($fst, $snd)"
+
       case Hole(Some(x)) => s"_$x"
       case Hole(None)    => "_"
 
@@ -62,6 +68,9 @@ object Syntax:
       case Lift(t)   => Lift(t.removePos)
       case Quote(t)  => Quote(t.removePos)
       case Splice(t) => Splice(t.removePos)
+
+      case PairTy(fst, snd) => PairTy(fst.removePos, snd.removePos)
+      case Pair(fst, snd)   => Pair(fst.removePos, snd.removePos)
 
       case Pos(_, t) => t
 

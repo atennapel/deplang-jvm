@@ -37,6 +37,18 @@ object Evaluation:
       VGlobal(x, SFoldNat(sp, t, z, s), () => vfoldnat(t, v(), z, s))
     case _ => impossible()
 
+  def vfst(v: Val): Val = v match
+    case VPair(fst, snd)   => fst
+    case VRigid(hd, sp)    => VRigid(hd, SFst(sp))
+    case VGlobal(x, sp, v) => VGlobal(x, SFst(sp), () => vfst(v()))
+    case _                 => impossible()
+
+  def vsnd(v: Val): Val = v match
+    case VPair(fst, snd)   => snd
+    case VRigid(hd, sp)    => VRigid(hd, SSnd(sp))
+    case VGlobal(x, sp, v) => VGlobal(x, SSnd(sp), () => vsnd(v()))
+    case _                 => impossible()
+
   def eval(tm: Tm)(implicit env: Env): Val = tm match
     case Local(ix) => env(ix.expose)
     case Global(x) =>
@@ -52,6 +64,11 @@ object Evaluation:
     case Pi(x, t, st, b) => VPi(x, eval(t), st, Clos(b))
     case Lam(x, b)       => VLam(x, Clos(b))
     case App(f, a)       => vapp(eval(f), eval(a))
+
+    case PairTy(fst, snd) => VPairTy(eval(fst), eval(snd))
+    case Pair(fst, snd)   => VPair(eval(fst), eval(snd))
+    case Fst(t)           => vfst(eval(t))
+    case Snd(t)           => vsnd(eval(t))
 
     case Lift(rep, t) => VLift(rep, eval(t))
     case Quote(t)     => vquote(eval(t))
@@ -88,6 +105,8 @@ object Evaluation:
           ),
           quote(s, unfold)
         )
+      case SFst(sp) => Fst(quote(hd, sp, unfold))
+      case SSnd(sp) => Snd(quote(hd, sp, unfold))
 
   private def quote(b: Clos, unfold: Unfold)(implicit k: Lvl): Tm =
     quote(b(VVar(k)), unfold)(k + 1)
@@ -101,6 +120,9 @@ object Evaluation:
 
       case VPi(x, t, st, b) => Pi(x, quote(t, unfold), st, quote(b, unfold))
       case VLam(x, b)       => Lam(x, quote(b, unfold))
+
+      case VPairTy(fst, snd) => PairTy(quote(fst, unfold), quote(snd, unfold))
+      case VPair(fst, snd)   => Pair(quote(fst, unfold), quote(snd, unfold))
 
       case VLift(rep, v) => Lift(rep, quote(v, unfold))
       case VQuote(v)     => Quote(quote(v, unfold))

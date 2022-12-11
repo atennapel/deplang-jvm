@@ -5,9 +5,11 @@ import common.Common.*
 object Syntax:
   enum Ty:
     case TNat
+    case TPair(fst: Ty, snd: Ty)
 
     override def toString: String = this match
-      case TNat => "Nat"
+      case TNat            => "Nat"
+      case TPair(fst, snd) => s"($fst ** $snd)"
   export Ty.*
 
   final case class TFun(left: Ty, right: Either[Ty, TFun]):
@@ -22,6 +24,10 @@ object Syntax:
     case Lam(name: Bind, body: Tm)
     case App(fn: Tm, arg: Tm)
 
+    case Pair(fst: Tm, snd: Tm)
+    case Fst(tm: Tm)
+    case Snd(tm: Tm)
+
     case Nat
     case Z
     case S(n: Tm)
@@ -35,6 +41,10 @@ object Syntax:
 
       case Lam(x, b) => s"(\\$x. $b)"
       case App(f, a) => s"($f $a)"
+
+      case Pair(fst, snd) => s"($fst, $snd)"
+      case Fst(t)         => s"(fst $t)"
+      case Snd(t)         => s"(snd $t)"
 
       case Nat        => "Nat"
       case Z          => "Z"

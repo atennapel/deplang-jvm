@@ -195,6 +195,16 @@ object Elaboration:
       case S.Pos(pos, tm)  => infer(tm)(ctx.enter(pos))
       case S.Type(S1)      => (Type(S1), VType(S1), S1)
       case S.Type(S0(rep)) => (Type(S0(rep)), VType(S0(RErased)), S0(RErased))
+      case S.App(S.Var(Name("fst")), t) =>
+        val (et, vt, st) = infer(t)
+        force(vt) match
+          case VPairTy(fst, snd) => (Fst(et), fst, S0(RVal))
+          case _ => throw ElaborateError(s"expected pair type in $tm")
+      case S.App(S.Var(Name("snd")), t) =>
+        val (et, vt, st) = infer(t)
+        force(vt) match
+          case VPairTy(fst, snd) => (Snd(et), snd, S0(RVal))
+          case _ => throw ElaborateError(s"expected pair type in $tm")
       case S.Var(Name("Nat")) => (Nat, VType(S0(RVal)), S0(RErased))
       case S.Var(Name("Z"))   => (Z, VNat, S0(RVal))
       case S.App(S.Var(Name("S")), n) =>
@@ -278,6 +288,14 @@ object Elaboration:
           case _ => throw ElaborateError(s"expected a lifted type in $tm")
         val (et2, vt2) = adjustStage(et1, vt, S1, S0(rep))
         (et2, vt2, S0(rep))
+      case S.PairTy(fst, snd) =>
+        val efst = checkType(fst, S0(RVal))
+        val esnd = checkType(snd, S0(RVal))
+        (PairTy(efst, esnd), VType(S0(RVal)), S0(RErased))
+      case S.Pair(fst, snd) =>
+        val (efst, t1) = infer(fst, S0(RVal))
+        val (esnd, t2) = infer(snd, S0(RVal))
+        (Pair(efst, esnd), VPairTy(t1, t2), S0(RVal))
       case _ => throw ElaborateError(s"cannot infer $tm")
 
   private def elaborate(tm: S.Tm, ty: Option[S.Ty], st: Stage): (Tm, Ty) =

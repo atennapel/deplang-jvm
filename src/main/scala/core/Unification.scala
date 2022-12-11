@@ -14,7 +14,9 @@ object Unification:
     case (SSplice(sp1), SSplice(sp2))   => unify(sp1, sp2)
     case (SFoldNat(sp1, t1, z1, s1), SFoldNat(sp2, t2, z2, s2)) =>
       unify(sp1, sp2); unify(t1, t2); unify(z1, z2); unify(s1, s2)
-    case _ => throw UnifyError("spine mismatch")
+    case (SFst(sp1), SFst(sp2)) => unify(sp1, sp2)
+    case (SSnd(sp1), SSnd(sp2)) => unify(sp1, sp2)
+    case _                      => throw UnifyError("spine mismatch")
 
   private def unify(a: Clos, b: Clos)(implicit k: Lvl): Unit =
     val v = VVar(k); unify(a(v), b(v))
@@ -30,6 +32,8 @@ object Unification:
       case (VQuote(a), VQuote(b))             => unify(a, b)
       case (VPi(_, t1, _, b1), VPi(_, t2, _, b2)) =>
         unify(t1, t2); unify(b1, b2)
+      case (VPair(a1, b1), VPair(a2, b2))     => unify(a1, a2); unify(b1, b2)
+      case (VPairTy(a1, b1), VPairTy(a2, b2)) => unify(a1, a2); unify(b1, b2)
       case (VRigid(h1, sp1), VRigid(h2, sp2)) if h1 == h2 => unify(sp1, sp2)
 
       case (VLam(_, b1), VLam(_, b2)) => unify(b1, b2)
