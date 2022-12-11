@@ -50,6 +50,22 @@ object Syntax:
     def isPos: Boolean = this match
       case Pos(_, t) => true
       case _         => false
+
+    def removePos: Tm = this match
+      case Let(x, s, t, v, b) =>
+        Let(x, s, t.map(_.removePos), v.removePos, b.removePos)
+
+      case Pi(x, t, b) => Pi(x, t.removePos, b.removePos)
+      case Lam(x, b)   => Lam(x, b.removePos)
+      case App(f, a)   => App(f.removePos, a.removePos)
+
+      case Lift(t)   => Lift(t.removePos)
+      case Quote(t)  => Quote(t.removePos)
+      case Splice(t) => Splice(t.removePos)
+
+      case Pos(_, t) => t
+
+      case _ => this
   export Tm.*
 
   final case class Defs(defs: List[Def]):

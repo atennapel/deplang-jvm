@@ -191,7 +191,7 @@ object Elaboration:
 
   private def infer(tm: S.Tm)(implicit ctx: Ctx): (Tm, VTy, Stage) =
     if !tm.isPos then debug(s"infer $tm")
-    tm match
+    tm.removePos match
       case S.Pos(pos, tm)  => infer(tm)(ctx.enter(pos))
       case S.Type(S1)      => (Type(S1), VType(S1), S1)
       case S.Type(S0(rep)) => (Type(S0(rep)), VType(S0(RErased)), S0(RErased))
