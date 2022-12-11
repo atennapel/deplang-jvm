@@ -19,4 +19,4 @@ object Main:
     println(pretty(cds)(Nil))
     println("staging:")
     val sds = stage(cds)
-    println(pretty(sds)(Nil))
+    println(sds)

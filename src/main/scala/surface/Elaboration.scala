@@ -203,9 +203,27 @@ object Elaboration:
       case S.Var(Name("S")) =>
         (
           Lam(DoBind(Name("x")), NatS(Local(ix0))),
-          VPi(DontBind, VNat, S0(RVal), Clos(Nil, Nat)),
+          VPi(DontBind, VNat, S0(RVal), CClos(Nil, Nat)),
           S0(RVal)
         )
+      /*
+      n : Nat
+      z : A
+      s : Nat -> A -> A
+      --------------------------------------
+      foldNat n z s ~> foldNat {A} n z s : A
+       */
+      case S.App(S.App(S.App(S.Var(Name("foldNat")), n), z), s) =>
+        val en = check(n, VNat, S0(RVal))
+        val (ez, vt) = infer(z, S0(RVal))
+        val es = check(
+          s,
+          vpi("_", VNat, S0(RFun), _ => vpi("_", vt, S0(RVal), _ => vt)),
+          S0(RFun)
+        )
+        (App(App(App(FoldNat(ctx.quote(vt)), en), ez), es), vt, S0(RVal))
+      case S.Var(Name("foldNat")) =>
+        throw ElaborateError(s"foldNat must be fully applied")
       case S.Var(x) =>
         ctx.lookup(x) match
           case Some((ix, ty, st)) => (Local(ix), ty, st)

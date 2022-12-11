@@ -6,7 +6,10 @@ import Syntax.*
 import Value.*
 
 object Evaluation:
-  extension (c: Clos) def apply(v: Val): Val = eval(c.tm)(v :: c.env)
+  extension (c: Clos)
+    def apply(v: Val): Val = c match
+      case CClos(env, tm) => eval(tm)(v :: env)
+      case CFun(f)        => f(v)
 
   def vapp(f: Val, a: Val): Val = f match
     case VLam(_, b)        => b(a)
@@ -24,6 +27,15 @@ object Evaluation:
     case VRigid(hd, sp)    => VRigid(hd, SSplice(sp))
     case VGlobal(x, sp, v) => VGlobal(x, SSplice(sp), () => vsplice(v()))
     case _                 => impossible()
+
+  def vfoldnat(t: VTy, n: Val, z: Val, s: Val): Val = n match
+    case VZ => z
+    // foldNat {t} (S n) z s ~> s n (foldNat {t} n z s)
+    case VS(n)          => vapp(vapp(s, n), vfoldnat(t, n, z, s))
+    case VRigid(hd, sp) => VRigid(hd, SFoldNat(sp, t, z, s))
+    case VGlobal(x, sp, v) =>
+      VGlobal(x, SFoldNat(sp, t, z, s), () => vfoldnat(t, v(), z, s))
+    case _ => impossible()
 
   def eval(tm: Tm)(implicit env: Env): Val = tm match
     case Local(ix) => env(ix.expose)
@@ -50,6 +62,8 @@ object Evaluation:
     case Nat  => VNat
     case Z    => VZ
     case S(n) => VS(eval(n))
+    case FoldNat(t) =>
+      vlam("n", n => vlam("z", z => vlam("s", s => vfoldnat(eval(t), n, z, s))))
 
   enum Unfold:
     case UnfoldNone
@@ -66,6 +80,14 @@ object Evaluation:
       case SId         => hd
       case SApp(sp, a) => App(quote(hd, sp, unfold), quote(a, unfold))
       case SSplice(sp) => Splice(quote(hd, sp, unfold))
+      case SFoldNat(sp, t, z, s) =>
+        App(
+          App(
+            App(FoldNat(quote(t, unfold)), quote(hd, sp, unfold)),
+            quote(z, unfold)
+          ),
+          quote(s, unfold)
+        )
 
   private def quote(b: Clos, unfold: Unfold)(implicit k: Lvl): Tm =
     quote(b(VVar(k)), unfold)(k + 1)

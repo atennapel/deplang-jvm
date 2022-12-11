@@ -39,20 +39,21 @@ object Pretty:
   private def prettyParen(tm: Tm, app: Boolean = false)(implicit
       ns: List[Name]
   ): String = tm match
-    case Local(_)         => pretty(tm)
-    case Global(_)        => pretty(tm)
-    case Type(S1)         => pretty(tm)
-    case Type(S0(RVal))   => pretty(tm)
-    case App(_, _) if app => pretty(tm)
-    case S(_) if app      => pretty(tm)
-    case S(_)             => toNat(tm).fold(s"(${pretty(tm)})")(n => s"$n")
-    case Lift(_, _)       => pretty(tm)
-    case Quote(_)         => pretty(tm)
-    case Splice(_)        => pretty(tm)
-    case Nat              => pretty(tm)
-    case Z                => pretty(tm)
-    case Wk(t)            => prettyParen(t, app)(ns.tail)
-    case _                => s"(${pretty(tm)})"
+    case Local(_)          => pretty(tm)
+    case Global(_)         => pretty(tm)
+    case Type(S1)          => pretty(tm)
+    case Type(S0(RVal))    => pretty(tm)
+    case App(_, _) if app  => pretty(tm)
+    case S(_) if app       => pretty(tm)
+    case S(_)              => toNat(tm).fold(s"(${pretty(tm)})")(n => s"$n")
+    case Lift(_, _)        => pretty(tm)
+    case Quote(_)          => pretty(tm)
+    case Splice(_)         => pretty(tm)
+    case Nat               => pretty(tm)
+    case Z                 => pretty(tm)
+    case FoldNat(t) if app => pretty(tm)
+    case Wk(t)             => prettyParen(t, app)(ns.tail)
+    case _                 => s"(${pretty(tm)})"
 
   def pretty(tm: Tm)(implicit ns: List[Name]): String = tm match
     case Local(ix) => s"${ns(ix.expose)}"
@@ -77,9 +78,10 @@ object Pretty:
 
     case Wk(t) => pretty(t)(ns.tail)
 
-    case Nat  => "Nat"
-    case Z    => prettyNat(tm)
-    case S(_) => prettyNat(tm)
+    case Nat        => "Nat"
+    case Z          => prettyNat(tm)
+    case S(_)       => prettyNat(tm)
+    case FoldNat(t) => s"foldNat {${pretty(t)}}"
 
   def pretty(d: Def)(implicit ns: List[Name]): String = d match
     case DDef(x0, s, t, v) =>

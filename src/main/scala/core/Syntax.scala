@@ -24,6 +24,7 @@ object Syntax:
     case Nat
     case Z
     case S(n: Tm)
+    case FoldNat(ty: Ty)
 
     override def toString: String = this match
       case Local(x)  => s"'$x"
@@ -46,9 +47,10 @@ object Syntax:
 
       case Wk(t) => s"(Wk $t)"
 
-      case Nat  => "Nat"
-      case Z    => "Z"
-      case S(n) => s"(S $n)"
+      case Nat        => "Nat"
+      case Z          => "Z"
+      case S(n)       => s"(S $n)"
+      case FoldNat(t) => s"(foldNat {$t})"
   export Tm.*
 
   def tQuote(t: Tm): Tm = t match

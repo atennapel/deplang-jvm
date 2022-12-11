@@ -12,7 +12,9 @@ object Unification:
     case (SId, SId)                     => ()
     case (SApp(sp1, a1), SApp(sp2, a2)) => unify(sp1, sp2); unify(a1, a2)
     case (SSplice(sp1), SSplice(sp2))   => unify(sp1, sp2)
-    case _                              => throw UnifyError("spine mismatch")
+    case (SFoldNat(sp1, t1, z1, s1), SFoldNat(sp2, t2, z2, s2)) =>
+      unify(sp1, sp2); unify(t1, t2); unify(z1, z2); unify(s1, s2)
+    case _ => throw UnifyError("spine mismatch")
 
   private def unify(a: Clos, b: Clos)(implicit k: Lvl): Unit =
     val v = VVar(k); unify(a(v), b(v))
