@@ -1,7 +1,16 @@
-id1 : (A : Type) -> A -> A = \A x. x;
+Nat1 = (A : Type1) -> A -> (A -> A) -> A;
+Z1 : Nat1 = \A z s. z;
+S1 : Nat1 -> Nat1 = \n A z s. s (n A z s);
+foldNat1 : (A : Type1) -> Nat1 -> A -> (A -> A) -> A = \A n z s. n A z s;
 
-id : Nat -> Nat := \x. x;
+fold : (A : Type) -> Nat -> A -> (Nat -> A -> A) -> A =
+  \A n z s. foldNat n z (\m r. s m r);
 
-test1 ::= id 3;
-test2 = id1 Nat 3;
-test3 ::= id1 Nat 3;
+pred : Nat -> Nat := \n. fold Nat n Z (\m _. m);
+(+) : Nat -> Nat -> Nat := \a b. fold Nat a b (\_ r. S r);
+(*) : Nat -> Nat -> Nat := \a b. fold Nat a Z (\_ r. b + r);
+
+pow : Nat1 -> Nat -> Nat =
+  \n m. foldNat1 Nat n 1 (\n. m * n);
+
+test ::= pow (S1 (S1 Z1)) 3;

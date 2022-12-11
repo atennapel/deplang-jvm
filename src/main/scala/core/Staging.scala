@@ -3,6 +3,7 @@ package core
 import common.Common.*
 import common.Debug.debug
 import Syntax.*
+import ir.Syntax as IR
 import Globals.getGlobal
 
 object Staging:
@@ -30,10 +31,15 @@ object Staging:
     case VPi0(name: Bind, rep: Rep, ty: Val0, body: Val0 => Val0)
     case VLam0(name: Bind, body: Val0 => Val0)
     case VLet0(name: Name, rep: Rep, ty: Val0, value: Val0, body: Val0 => Val0)
+    case VPairTy0(fst: Val0, snd: Val0)
+    case VPair0(fst: Val0, snd: Val0)
+    case VFst0(tm: Val0)
+    case VSnd0(tm: Val0)
     case VType0(rep: Rep)
     case VNat0
     case VZ0
     case VS0(n: Val0)
+    case VFoldNat0(ty: Val0)
   import Val0.*
 
   private def vvar1(ix: Ix)(implicit env: Env): Val1 =
@@ -62,15 +68,21 @@ object Staging:
     case Lam(x, b)       => VLam1(v => eval1Bind(b, v))
     case App(f, a)       => vapp1(eval1(f), eval1(a))
 
+    case PairTy(_, _) => impossible()
+    case Pair(_, _)   => impossible()
+    case Fst(_)       => impossible()
+    case Snd(_)       => impossible()
+
     case Lift(rep, t) => VType1
     case Quote(t)     => VQuote(eval0(t))
     case Splice(t)    => impossible()
 
     case Wk(t) => eval1(t)(env.tail)
 
-    case Nat  => impossible()
-    case Z    => impossible()
-    case S(_) => impossible()
+    case Nat        => impossible()
+    case Z          => impossible()
+    case S(_)       => impossible()
+    case FoldNat(_) => impossible()
 
   private def vvar0(ix: Ix)(implicit env: Env): Val0 =
     def go(env: Env, i: Int): Val0 = (env, i) match
@@ -102,36 +114,69 @@ object Staging:
     case Lam(x, b)            => VLam0(x, v => eval0Bind(b, v))
     case App(f, a)            => VApp0(eval0(f), eval0(a))
 
+    case PairTy(fst, snd) => VPairTy0(eval0(fst), eval0(snd))
+    case Pair(fst, snd)   => VPair0(eval0(fst), eval0(snd))
+    case Fst(t)           => VFst0(eval0(t))
+    case Snd(t)           => VSnd0(eval0(t))
+
     case Lift(rep, t) => impossible()
     case Quote(t)     => impossible()
     case Splice(t)    => vsplice(eval1(t))
 
     case Wk(t) => eval0(t)(env.tail)
 
-    case Nat  => VNat0
-    case Z    => VZ0
-    case S(n) => VS0(eval0(n))
+    case Nat        => VNat0
+    case Z          => VZ0
+    case S(n)       => VS0(eval0(n))
+    case FoldNat(t) => VFoldNat0(eval0(t))
 
-  private def quote0(v: Val0)(implicit k: Lvl): Tm = v match
-    case VVar0(l)    => Local(l.toIx)
-    case VGlobal0(x) => Global(x)
-    case VApp0(f, a) => App(quote0(f), quote0(a))
-    case VPi0(x, rep, t, b) =>
-      Pi(x, quote0(t), S0(rep), quote0(b(VVar0(k)))(k + 1))
-    case VLam0(x, b) => Lam(x, quote0(b(VVar0(k)))(k + 1))
-    case VLet0(x, rep, t, v, b) =>
-      Let(x, S0(rep), quote0(t), quote0(v), quote0(b(VVar0(k)))(k + 1))
-    case VType0(rep)  => Type(S0(rep))
-    case VNat0        => Nat
-    case VZ0          => Z
-    case VS0(n: Val0) => S(quote0(n))
+  private def quote0ir(v: Val0)(implicit k: Lvl): IR.Tm = v match
+    case VVar0(l)           => IR.Local(l.toIx)
+    case VGlobal0(x)        => IR.Global(x)
+    case VApp0(f, a)        => IR.App(quote0ir(f), quote0ir(a))
+    case VPi0(x, rep, t, b) => impossible()
+    case VLam0(x, b)        => IR.Lam(x, quote0ir(b(VVar0(k)))(k + 1))
+    case VLet0(x, RVal, t, v, b) =>
+      IR.Let(x, Left(quote0ty(t)), quote0ir(v), quote0ir(b(VVar0(k)))(k + 1))
+    case VLet0(x, RFun, t, v, b) =>
+      IR.Let(x, Right(quote0fun(t)), quote0ir(v), quote0ir(b(VVar0(k)))(k + 1))
+    case VZ0                => IR.Z
+    case VS0(n: Val0)       => IR.S(quote0ir(n))
+    case VFoldNat0(t: Val0) => IR.FoldNat(quote0ty(t))
+    case VPair0(fst, snd)   => IR.Pair(quote0ir(fst), quote0ir(snd))
+    case VFst0(t)           => IR.Fst(quote0ir(t))
+    case VSnd0(t)           => IR.Snd(quote0ir(t))
+    case _                  => impossible()
 
-  private def stage(tm: Tm): Tm =
-    debug(s"stage $tm")
-    quote0(eval0(tm)(Empty))(lvl0)
+  private def quote0ty(v: Val0)(implicit k: Lvl): IR.Ty = v match
+    case VNat0              => IR.TNat
+    case VPairTy0(fst, snd) => IR.TPair(quote0ty(fst), quote0ty(snd))
+    case _                  => impossible()
 
-  private def stage(d: Def): Option[Def] = d match
-    case DDef(x, st @ S0(_), t, v) => Some(DDef(x, st, stage(t), stage(v)))
-    case _                         => None
+  private def quote0fun(v: Val0)(implicit k: Lvl): IR.TFun = v match
+    case VPi0(_, RVal, t, b) =>
+      IR.TFun(quote0ty(t), Left(quote0ty(b(VVar0(k)))(k + 1)))
+    case VPi0(_, RFun, t, b) =>
+      IR.TFun(quote0ty(t), Right(quote0fun(b(VVar0(k)))(k + 1)))
+    case _ => impossible()
 
-  def stage(ds: Defs): Defs = Defs(ds.toList.flatMap(stage))
+  private def stageIR(tm: Tm): IR.Tm =
+    debug(s"stageIR $tm")
+    quote0ir(eval0(tm)(Empty))(lvl0)
+
+  private def stageIRTy(tm: Tm): IR.Ty =
+    debug(s"stageIRTy $tm")
+    quote0ty(eval0(tm)(Empty))(lvl0)
+
+  private def stageIRFun(tm: Tm): IR.TFun =
+    debug(s"stageIRFun $tm")
+    quote0fun(eval0(tm)(Empty))(lvl0)
+
+  private def stage(d: Def): Option[IR.Def] = d match
+    case DDef(x, st @ S0(RVal), t, v) =>
+      Some(IR.DDef(x, Left(stageIRTy(t)), stageIR(v)))
+    case DDef(x, st @ S0(RFun), t, v) =>
+      Some(IR.DDef(x, Right(stageIRFun(t)), stageIR(v)))
+    case _ => None
+
+  def stage(ds: Defs): IR.Defs = IR.Defs(ds.toList.flatMap(stage))

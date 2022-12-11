@@ -1,0 +1,12 @@
+Nat1 = (A : ^Type) -> A -> (A -> A) -> A;
+Z1 : Nat1 = \A z s. z;
+S1 : Nat1 -> Nat1 = \n A z s. s (n A z s);
+foldNat1 : (A : Type) -> Nat1 -> A -> (A -> A) -> A = \A n z s. n A z s;
+
+add1 : Nat1 -> Nat1 -> Nat1 = \b a A z s. a A (b A z s) s;
+mul1 : Nat1 -> Nat1 -> Nat1 = \b a A z s. a A z (\x. b A x s);
+
+up : Nat -> Nat1 = \n A z s. foldNat n z (\_ r. s r);
+down : Nat1 -> Nat = \n. n Nat Z S;
+
+test : Nat -> Nat := \n. down (add1 (S1 Z1) (mul1 (S1 (S1 Z1)) (up n)));

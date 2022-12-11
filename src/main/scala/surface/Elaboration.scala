@@ -28,13 +28,13 @@ object Elaboration:
       val (etm, vty) = infer(v, st)
       (etm, ctx.quote(vty), vty)
     case Some(ty) =>
-      val ety = checkType(ty, st.split(_ => S0(RErased), S1))
+      val ety = checkType(ty, st)
       val vty = ctx.eval(ety)
       val etm = check(v, vty, st)
       (etm, ety, vty)
 
   private def checkType(t: S.Ty, st: Stage)(implicit ctx: Ctx): Ty =
-    check(t, VType(st), st)
+    check(t, VType(st), st.split(_ => S0(RErased), S1))
 
   private def inferType(t: S.Ty)(implicit ctx: Ctx): (Ty, Stage) =
     val (et, vt, st) = infer(t)
@@ -73,6 +73,9 @@ object Elaboration:
   private def coe(t: Tm, a: VTy, st1: Stage, b: VTy, st2: Stage)(implicit
       ctx: Ctx
   ): Tm =
+    debug(
+      s"coeTop ${ctx.pretty(t)} : ${ctx.pretty(a)} : $st1 to ${ctx.pretty(b)} : $st2"
+    )
     def pick(x: Bind, y: Bind)(implicit ctx: Ctx): Bind = ctx.fresh((x, y) match
       case (DontBind, DontBind) => DoBind(Name("x"))
       case (DontBind, x)        => x
@@ -172,6 +175,7 @@ object Elaboration:
 
       case (tm, _) =>
         val (etm, ty2, st2) = infer(tm)
+        debug(s"check inferred ${ctx.pretty(etm)} : ${ctx.pretty(ty2)} : $st2")
         coe(etm, ty2, st2, ty, st)
 
   private def infer(tm: S.Tm, st: Stage)(implicit ctx: Ctx): (Tm, VTy) =
@@ -180,14 +184,27 @@ object Elaboration:
       case S.Pos(pos, tm) => infer(tm, st)(ctx.enter(pos))
       case tm =>
         val (et, vt, st2) = infer(tm)
-        adjustStage(et, vt, st2, st)
+        debug(s"inferred ${ctx.pretty(et)}")
+        val (et2, vt2) = adjustStage(et, vt, st2, st)
+        debug(s"adjusted ${ctx.pretty(et2)}")
+        (et2, vt2)
 
   private def infer(tm: S.Tm)(implicit ctx: Ctx): (Tm, VTy, Stage) =
     if !tm.isPos then debug(s"infer $tm")
-    tm match
+    tm.removePos match
       case S.Pos(pos, tm)  => infer(tm)(ctx.enter(pos))
       case S.Type(S1)      => (Type(S1), VType(S1), S1)
       case S.Type(S0(rep)) => (Type(S0(rep)), VType(S0(RErased)), S0(RErased))
+      case S.App(S.Var(Name("fst")), t) =>
+        val (et, vt, st) = infer(t)
+        force(vt) match
+          case VPairTy(fst, snd) => (Fst(et), fst, S0(RVal))
+          case _ => throw ElaborateError(s"expected pair type in $tm")
+      case S.App(S.Var(Name("snd")), t) =>
+        val (et, vt, st) = infer(t)
+        force(vt) match
+          case VPairTy(fst, snd) => (Snd(et), snd, S0(RVal))
+          case _ => throw ElaborateError(s"expected pair type in $tm")
       case S.Var(Name("Nat")) => (Nat, VType(S0(RVal)), S0(RErased))
       case S.Var(Name("Z"))   => (Z, VNat, S0(RVal))
       case S.App(S.Var(Name("S")), n) =>
@@ -196,9 +213,27 @@ object Elaboration:
       case S.Var(Name("S")) =>
         (
           Lam(DoBind(Name("x")), NatS(Local(ix0))),
-          VPi(DontBind, VNat, S0(RVal), Clos(Nil, Nat)),
+          VPi(DontBind, VNat, S0(RVal), CClos(Nil, Nat)),
           S0(RVal)
         )
+      /*
+      n : Nat
+      z : A
+      s : Nat -> A -> A
+      --------------------------------------
+      foldNat n z s ~> foldNat {A} n z s : A
+       */
+      case S.App(S.App(S.App(S.Var(Name("foldNat")), n), z), s) =>
+        val en = check(n, VNat, S0(RVal))
+        val (ez, vt) = infer(z, S0(RVal))
+        val es = check(
+          s,
+          vpi("_", VNat, S0(RFun), _ => vpi("_", vt, S0(RVal), _ => vt)),
+          S0(RFun)
+        )
+        (App(App(App(FoldNat(ctx.quote(vt)), en), ez), es), vt, S0(RVal))
+      case S.Var(Name("foldNat")) =>
+        throw ElaborateError(s"foldNat must be fully applied")
       case S.Var(x) =>
         ctx.lookup(x) match
           case Some((ix, ty, st)) => (Local(ix), ty, st)
@@ -215,12 +250,12 @@ object Elaboration:
         val (eb, st2) = st1 match
           case S1 => (checkType(b, S1)(ctx.bind(x, ctx.eval(et), S1)), S1)
           case _  => inferType(b)(ctx.bind(x, ctx.eval(et), st1))
-        val (rt, st3) = (st1, st2) match
-          case (S1, S1)             => (S1, S1)
-          case (S0(RVal), S0(RVal)) => (S0(RVal), S0(RErased))
-          case (S0(RVal), S0(RFun)) => (S0(RFun), S0(RErased))
+        val (rt, st3, st4) = (st1, st2) match
+          case (S1, S1)             => (S1, S1, S1)
+          case (S0(RVal), S0(RVal)) => (S0(RVal), S0(RFun), S0(RErased))
+          case (S0(RVal), S0(RFun)) => (S0(RFun), S0(RFun), S0(RErased))
           case _ => throw ElaborateError(s"wrong staging: $tm ($st1, $st2)")
-        (Pi(x, et, rt, eb), VType(st3), st3)
+        (Pi(x, et, rt, eb), VType(st3), st4)
       case S.App(f, a) =>
         val (ef, fty, st) = infer(f)
         force(fty) match
@@ -252,7 +287,15 @@ object Elaboration:
           case VLift(rep, _) => rep
           case _ => throw ElaborateError(s"expected a lifted type in $tm")
         val (et2, vt2) = adjustStage(et1, vt, S1, S0(rep))
-        (et2, vt, S0(rep))
+        (et2, vt2, S0(rep))
+      case S.PairTy(fst, snd) =>
+        val efst = checkType(fst, S0(RVal))
+        val esnd = checkType(snd, S0(RVal))
+        (PairTy(efst, esnd), VType(S0(RVal)), S0(RErased))
+      case S.Pair(fst, snd) =>
+        val (efst, t1) = infer(fst, S0(RVal))
+        val (esnd, t2) = infer(snd, S0(RVal))
+        (Pair(efst, esnd), VPairTy(t1, t2), S0(RVal))
       case _ => throw ElaborateError(s"cannot infer $tm")
 
   private def elaborate(tm: S.Tm, ty: Option[S.Ty], st: Stage): (Tm, Ty) =

@@ -16,5 +16,5 @@ TODO:
 - [x] Elaboration
 - [x] Pretty printing
 - [x] Staging
-- [ ] IR syntax
+- [x] IR syntax
 - [ ] Bytecode generation
