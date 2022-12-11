@@ -136,10 +136,8 @@ object Staging:
     case VApp0(f, a)        => IR.App(quote0ir(f), quote0ir(a))
     case VPi0(x, rep, t, b) => impossible()
     case VLam0(x, b)        => IR.Lam(x, quote0ir(b(VVar0(k)))(k + 1))
-    case VLet0(x, RVal, t, v, b) =>
-      IR.Let(x, Left(quote0ty(t)), quote0ir(v), quote0ir(b(VVar0(k)))(k + 1))
-    case VLet0(x, RFun, t, v, b) =>
-      IR.Let(x, Right(quote0fun(t)), quote0ir(v), quote0ir(b(VVar0(k)))(k + 1))
+    case VLet0(x, _, t, v, b) =>
+      IR.Let(x, quote0def(t), quote0ir(v), quote0ir(b(VVar0(k)))(k + 1))
     case VZ0                => IR.Z
     case VS0(n: Val0)       => IR.S(quote0ir(n))
     case VFoldNat0(t: Val0) => IR.FoldNat(quote0ty(t))
@@ -153,12 +151,15 @@ object Staging:
     case VPairTy0(fst, snd) => IR.TPair(quote0ty(fst), quote0ty(snd))
     case _                  => impossible()
 
-  private def quote0fun(v: Val0)(implicit k: Lvl): IR.TFun = v match
-    case VPi0(_, RVal, t, b) =>
-      IR.TFun(quote0ty(t), Left(quote0ty(b(VVar0(k)))(k + 1)))
-    case VPi0(_, RFun, t, b) =>
-      IR.TFun(quote0ty(t), Right(quote0fun(b(VVar0(k)))(k + 1)))
-    case _ => impossible()
+  private def quote0def(v: Val0, ps: List[IR.Ty] = Nil)(implicit
+      k: Lvl
+  ): IR.TDef =
+    v match
+      case VPi0(_, RVal, t, b) =>
+        IR.TDef(ps.reverse ++ List(quote0ty(t)), quote0ty(b(VVar0(k)))(k + 1))
+      case VPi0(_, RFun, t, b) =>
+        quote0def(b(VVar0(k)), quote0ty(t) :: ps)(k + 1)
+      case _ => impossible()
 
   private def stageIR(tm: Tm): IR.Tm =
     debug(s"stageIR $tm")
@@ -168,15 +169,13 @@ object Staging:
     debug(s"stageIRTy $tm")
     quote0ty(eval0(tm)(Empty))(lvl0)
 
-  private def stageIRFun(tm: Tm): IR.TFun =
-    debug(s"stageIRFun $tm")
-    quote0fun(eval0(tm)(Empty))(lvl0)
+  private def stageIRDef(tm: Tm): IR.TDef =
+    debug(s"stageIRDef $tm")
+    quote0def(eval0(tm)(Empty))(lvl0)
 
   private def stage(d: Def): Option[IR.Def] = d match
-    case DDef(x, st @ S0(RVal), t, v) =>
-      Some(IR.DDef(x, Left(stageIRTy(t)), stageIR(v)))
-    case DDef(x, st @ S0(RFun), t, v) =>
-      Some(IR.DDef(x, Right(stageIRFun(t)), stageIR(v)))
+    case DDef(x, _, t, v) =>
+      Some(IR.DDef(x, stageIRDef(t), stageIR(v)))
     case _ => None
 
   def stage(ds: Defs): IR.Defs = IR.Defs(ds.toList.flatMap(stage))

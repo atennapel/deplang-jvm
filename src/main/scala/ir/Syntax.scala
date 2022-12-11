@@ -12,14 +12,15 @@ object Syntax:
       case TPair(fst, snd) => s"($fst ** $snd)"
   export Ty.*
 
-  final case class TFun(left: Ty, right: Either[Ty, TFun]):
-    override def toString: String =
-      s"($left -> ${right.fold(_.toString, _.toString)})"
+  final case class TDef(params: List[Ty], retrn: Ty):
+    override def toString: String = params match
+      case Nil => retrn.toString
+      case ps  => s"(${ps.mkString(" -> ")} -> $retrn)"
 
   enum Tm:
     case Local(ix: Ix)
     case Global(name: Name)
-    case Let(name: Name, ty: Either[Ty, TFun], value: Tm, body: Tm)
+    case Let(name: Name, ty: TDef, value: Tm, body: Tm)
 
     case Lam(name: Bind, body: Tm)
     case App(fn: Tm, arg: Tm)
@@ -58,9 +59,8 @@ object Syntax:
     def toList: List[Def] = defs
 
   enum Def:
-    case DDef(name: Name, ty: Either[Ty, TFun], value: Tm)
+    case DDef(name: Name, ty: TDef, value: Tm)
 
     override def toString: String = this match
-      case DDef(x, Left(t), v)  => s"$x : $t = $v;"
-      case DDef(x, Right(t), v) => s"$x : $t = $v;"
+      case DDef(x, t, v) => s"$x : $t = $v;"
   export Def.*
