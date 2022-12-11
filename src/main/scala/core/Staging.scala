@@ -174,7 +174,7 @@ object Staging:
     quote0def(eval0(tm)(Empty))(lvl0)
 
   private def stage(d: Def): Option[IR.Def] = d match
-    case DDef(x, _, t, v) =>
+    case DDef(x, S0(_), t, v) =>
       Some(IR.DDef(x, stageIRDef(t), stageIR(v)))
     case _ => None
 

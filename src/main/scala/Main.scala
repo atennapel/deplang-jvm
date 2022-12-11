@@ -10,13 +10,14 @@ import parsley.io.given
 
 object Main:
   @main def run(filename0: String) =
-    setDebug(true)
+    setDebug(false)
     var filename = filename0
     if !filename.endsWith(".lang") then filename = s"$filename0.lang"
     val moduleName = filename.dropRight(5)
     val ds = parser.parseFromFile(new File(filename)).flatMap(_.toTry).get
     val cds = elaborate(ds)
+    println("elaborated:")
     println(pretty(cds)(Nil))
-    println("staging:")
+    println("staged:")
     val sds = stage(cds)
     println(sds)
