@@ -92,8 +92,8 @@ object Elaboration:
         ctx: Ctx
     ): Option[Tm] =
       tryAdjustStage(t, a, st1, st2) match
-        case None         => unify(a, b); None
-        case Some((t, a)) => unify(a, b); Some(t)
+        case None         => unify(st1, st2); unify(a, b); None
+        case Some((t, a)) => unify(st1, st2); unify(a, b); Some(t)
     def go(
         t: Tm,
         a: VTy,
@@ -133,7 +133,7 @@ object Elaboration:
                 case Some(body) => Some(Lam(pick(x1, x2), i1, body))
         case (VU(vf), VU1) => Some(Lift(ctx.quote(vf), t))
         case (VLift(r1, a), VLift(r2, b)) =>
-          if r1 != r2 then throw ElaborateError(s"Rep mismatch $r1 != $r2")
+          unify(r1, r2)
           unify(a, b)
           None
         case (VLift(vf, a), b) => Some(coe(tSplice(t), a, VU(vf), b, st2))
