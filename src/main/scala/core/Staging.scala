@@ -72,13 +72,12 @@ object Staging:
     case U0    => VU0
     case U1    => VU1
 
-    case Nat           => VNat1
-    case PairTy(a, b)  => VPairTy1(eval1(a), eval1(b))
-    case Fun(a, vf, b) => VFun1(eval1(a), eval1(vf), eval1(b))
+    case Nat          => VNat1
+    case PairTy(a, b) => VPairTy1(eval1(a), eval1(b))
 
-    case Pi(x, t, b) => VType1
-    case Lam(x, b)   => VLam1(v => eval1Bind(b, v))
-    case App(f, a)   => vapp1(eval1(f), eval1(a))
+    case Pi(x, a, _, b, u) => VFun1(eval1(a), eval1(u), eval1(b))
+    case Lam(x, b)         => VLam1(v => eval1Bind(b, v))
+    case App(f, a)         => vapp1(eval1(f), eval1(a))
 
     case Lift(rep, t) => VType1
     case Quote(t)     => VQuote(eval0(t))
@@ -149,12 +148,10 @@ object Staging:
     case VSnd0(t)         => IR.Snd(quote0ir(t))
     case _                => impossible()
 
-  private def quote1ty(v: Val1)(implicit k: Lvl): IR.Ty =
-    println(v)
-    v match
-      case VNat1              => IR.TNat
-      case VPairTy1(fst, snd) => IR.TPair(quote1ty(fst), quote1ty(snd))
-      case _                  => impossible()
+  private def quote1ty(v: Val1)(implicit k: Lvl): IR.Ty = v match
+    case VNat1              => IR.TNat
+    case VPairTy1(fst, snd) => IR.TPair(quote1ty(fst), quote1ty(snd))
+    case _                  => impossible()
 
   private def quote1tdef(v: Val1, ps: List[IR.Ty] = Nil)(implicit
       k: Lvl
@@ -177,10 +174,12 @@ object Staging:
     quote1tdef(eval1(tm)(Empty))(lvl0)
 
   private def stage(d: Def): Option[IR.Def] = d match
-    case DDef(x, App(U0, VFVal), t, v) =>
-      Some(IR.DDef(x, IR.TDef(Nil, stageIRTy(t)), stageIR(v)))
-    case DDef(x, App(U0, VFFun), t, v) =>
-      Some(IR.DDef(x, stageIRTDef(t), stageIR(v)))
+    case DDef(x, u, t, v) =>
+      eval1(u)(Empty) match
+        case VU0app(VVFVal1) =>
+          Some(IR.DDef(x, IR.TDef(Nil, stageIRTy(t)), stageIR(v)))
+        case VU0app(VVFFun1) => Some(IR.DDef(x, stageIRTDef(t), stageIR(v)))
+        case _               => None
     case _ => None
 
   def stage(ds: Defs): IR.Defs = IR.Defs(ds.toList.flatMap(stage))

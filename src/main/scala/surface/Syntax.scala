@@ -9,7 +9,6 @@ object Syntax:
     case Let(name: Name, univ: Ty, ty: Option[Ty], value: Tm, body: Tm)
 
     case Pi(name: Bind, ty: Ty, body: Ty)
-    case Fun(left: Ty, right: Ty)
     case Lam(name: Bind, body: Tm)
     case App(fn: Tm, arg: Tm)
 
@@ -43,7 +42,6 @@ object Syntax:
 
       case Pi(DontBind, t, b)  => s"($t -> $b)"
       case Pi(DoBind(x), t, b) => s"(($x : $t) -> $b)"
-      case Fun(a, b)           => s"($a => $b)"
       case Lam(x, b)           => s"(\\$x. $b)"
       case App(f, a)           => s"($f $a)"
 
@@ -68,7 +66,6 @@ object Syntax:
         Let(x, s, t.map(_.removePos), v.removePos, b.removePos)
 
       case Pi(x, t, b) => Pi(x, t.removePos, b.removePos)
-      case Fun(a, b)   => Fun(a.removePos, b.removePos)
       case Lam(x, b)   => Lam(x, b.removePos)
       case App(f, a)   => App(f.removePos, a.removePos)
 

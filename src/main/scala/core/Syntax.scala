@@ -15,8 +15,7 @@ object Syntax:
     case U0
     case U1
 
-    case Pi(name: Bind, ty: Ty, body: Ty)
-    case Fun(left: Ty, vf: Ty, right: Ty)
+    case Pi(name: Bind, ty: Ty, u1: Ty, body: Ty, u2: Ty)
     case Lam(name: Bind, body: Tm)
     case App(fn: Tm, arg: Tm)
 
@@ -54,11 +53,10 @@ object Syntax:
       case U0    => s"U0"
       case U1    => s"U1"
 
-      case Pi(DontBind, t, b)  => s"($t -> $b)"
-      case Pi(DoBind(x), t, b) => s"(($x : $t) -> $b)"
-      case Fun(a, _, b)        => s"($a => $b)"
-      case Lam(x, b)           => s"(\\$x. $b)"
-      case App(f, a)           => s"($f $a)"
+      case Pi(DontBind, t, u1, b, u2)  => s"($t ->{$u1}{$u2} $b)"
+      case Pi(DoBind(x), t, u1, b, u2) => s"(($x : $t) ->{$u1}{$u2} $b)"
+      case Lam(x, b)                   => s"(\\$x. $b)"
+      case App(f, a)                   => s"($f $a)"
 
       case PairTy(fst, snd) => s"($fst ** $snd)"
       case Pair(fst, snd)   => s"($fst, $snd)"

@@ -35,7 +35,6 @@ object Parser:
         ".",
         ",",
         "->",
-        "=>",
         "**",
         "^",
         "`",
@@ -112,7 +111,6 @@ object Parser:
     lazy val tm: Parsley[Tm] = positioned(
       attempt(pi) <|> let <|> lam <|>
         precedence[Tm](app)(
-          Ops(InfixR)("=>" #> ((l, r) => Fun(l, r))),
           Ops(InfixR)("->" #> ((l, r) => Pi(DontBind, l, r)))
         )
     )

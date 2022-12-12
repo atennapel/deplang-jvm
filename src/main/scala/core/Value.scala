@@ -37,8 +37,7 @@ object Value:
     case VVFFun
     case VU1
 
-    case VPi(name: Bind, ty: VTy, body: Clos)
-    case VFun(left: VTy, vf: VTy, right: VTy)
+    case VPi(name: Bind, ty: VTy, u1: VTy, body: Clos, u2: VTy)
     case VLam(name: Bind, body: Clos)
 
     case VPairTy(fst: VTy, snd: VTy)
@@ -55,8 +54,8 @@ object Value:
   private def name(x: String): Bind =
     if x == "_" then DontBind else DoBind(Name(x))
   def vlam(x: String, f: Val => Val): Val = VLam(name(x), CFun(f))
-  def vpi(x: String, t: Val, f: Val => Val): Val =
-    VPi(name(x), t, CFun(f))
+  def vpi(x: String, t: Val, u1: VTy, u2: VTy, f: Val => Val): Val =
+    VPi(name(x), t, u1, CFun(f), u2)
 
   object VVar:
     def apply(lvl: Lvl) = VRigid(HVar(lvl), SId)

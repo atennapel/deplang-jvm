@@ -65,10 +65,9 @@ object Evaluation:
     case U0    => VU0()
     case U1    => VU1
 
-    case Pi(x, t, b)   => VPi(x, eval(t), Clos(b))
-    case Fun(a, vf, b) => VFun(eval(a), eval(vf), eval(b))
-    case Lam(x, b)     => VLam(x, Clos(b))
-    case App(f, a)     => vapp(eval(f), eval(a))
+    case Pi(x, t, u1, b, u2) => VPi(x, eval(t), eval(u1), Clos(b), eval(u2))
+    case Lam(x, b)           => VLam(x, Clos(b))
+    case App(f, a)           => vapp(eval(f), eval(a))
 
     case PairTy(fst, snd) => VPairTy(eval(fst), eval(snd))
     case Pair(fst, snd)   => VPair(eval(fst), eval(snd))
@@ -131,9 +130,14 @@ object Evaluation:
       case VU0()  => U0
       case VU1    => U1
 
-      case VPi(x, t, b) => Pi(x, quote(t, unfold), quote(b, unfold))
-      case VFun(a, vf, b) =>
-        Fun(quote(a, unfold), quote(vf, unfold), quote(b, unfold))
+      case VPi(x, t, u1, b, u2) =>
+        Pi(
+          x,
+          quote(t, unfold),
+          quote(u1, unfold),
+          quote(b, unfold),
+          quote(u2, unfold)
+        )
       case VLam(x, b) => Lam(x, quote(b, unfold))
 
       case VPairTy(fst, snd) => PairTy(quote(fst, unfold), quote(snd, unfold))

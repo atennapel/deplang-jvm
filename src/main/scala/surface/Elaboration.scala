@@ -106,69 +106,26 @@ object Elaboration:
             .pretty(b)} : ${ctx.pretty(st2)}"
       )
       (force(a), force(b)) match
-        case (VPi(x1, a1, b1), VFun(a2, u2, b2)) =>
-          val x1 = DoBind(Name("x"))
-          val ctx2 = ctx.bind(x1, a2, VUVal())
-          val coev0 = go(Local(ix0), a2, VUVal(), a1, VU1)(ctx2)
-          coev0 match
-            case None =>
-              val body =
-                go(App(Wk(t), Local(ix0)), b1(VVar(ctx.lvl)), VU1, b2, u2)(ctx2)
-              body.map(Lam(x1, _))
-            case Some(coev0) =>
-              val body =
-                go(App(Wk(t), coev0), b1(ctx2.eval(coev0)), VU1, b2, u2)(ctx2)
-              body match
-                case None       => Some(Lam(x1, App(Wk(t), coev0)))
-                case Some(body) => Some(Lam(x1, body))
-        case (VFun(a1, u1, b1), VPi(x2, a2, b2)) =>
-          val x1 = DoBind(Name("x"))
-          val ctx2 = ctx.bind(x1, a2, VU1)
-          val coev0 = go(Local(ix0), a2, VU1, a1, VUVal())(ctx2)
-          coev0 match
-            case None =>
-              val body =
-                go(App(Wk(t), Local(ix0)), b1, u1, b2(VVar(ctx.lvl)), VU1)(ctx2)
-              body.map(Lam(x1, _))
-            case Some(coev0) =>
-              val body =
-                go(App(Wk(t), coev0), b1, u1, b2(VVar(ctx.lvl)), VU1)(ctx2)
-              body match
-                case None       => Some(Lam(x1, App(Wk(t), coev0)))
-                case Some(body) => Some(Lam(x1, body))
-        case (VFun(a1, u1, b1), VFun(a2, u2, b2)) =>
-          val x1 = DoBind(Name("x"))
-          val ctx2 = ctx.bind(x1, a2, VUVal())
-          val coev0 = go(Local(ix0), a2, VUVal(), a1, VUVal())(ctx2)
-          coev0 match
-            case None =>
-              val body = go(App(Wk(t), Local(ix0)), b1, u1, b2, u2)(ctx2)
-              body.map(Lam(x1, _))
-            case Some(coev0) =>
-              val body = go(App(Wk(t), coev0), b1, u1, b2, u2)(ctx2)
-              body match
-                case None       => Some(Lam(x1, App(Wk(t), coev0)))
-                case Some(body) => Some(Lam(x1, body))
-        case (VPi(x1, a1, b1), VPi(x2, a2, b2)) =>
-          val ctx2 = ctx.bind(x1, a2, st2)
-          val coev0 = go(Local(ix0), a2, VU1, a1, VU1)(ctx2)
+        case (VPi(x1, a1, u11, b1, u12), VPi(x2, a2, u21, b2, u22)) =>
+          val ctx2 = ctx.bind(x1, a2, u21)
+          val coev0 = go(Local(ix0), a2, u21, a1, u11)(ctx2)
           coev0 match
             case None =>
               val body = go(
                 App(Wk(t), Local(ix0)),
                 b1(VVar(ctx.lvl)),
-                VU1,
+                u12,
                 b2(VVar(ctx.lvl)),
-                VU1
+                u22
               )(ctx2)
               body.map(Lam(x1, _))
             case Some(coev0) =>
               val body = go(
                 App(Wk(t), coev0),
                 b1(ctx2.eval(coev0)),
-                VU1,
+                u12,
                 b2(VVar(ctx.lvl)),
-                VU1
+                u22
               )(ctx2)
               body match
                 case None       => Some(Lam(pick(x1, x2), App(Wk(t), coev0)))
@@ -192,12 +149,21 @@ object Elaboration:
         throw ElaborateError(
           s"hole found _${x.getOrElse("")} : ${ctx.pretty(ty)}"
         )
-      case (S.Lam(x, b), VPi(_, t, rt)) =>
-        val eb = check(b, rt(VVar(ctx.lvl)), VU1)(ctx.bind(x, t, VU1))
+      case (S.Lam(x, b), VPi(_, t, u1, rt, u2)) =>
+        val eb = check(b, rt(VVar(ctx.lvl)), u2)(ctx.bind(x, t, u1))
         Lam(x, eb)
-      case (S.Lam(x, b), VFun(t1, u, t2)) =>
-        val eb = check(b, t2, u)(ctx.bind(x, t1, VUVal()))
-        Lam(x, eb)
+
+      case (S.Pi(x, t, b), VU1) =>
+        val et = checkType(t, VU1)
+        val eb = checkType(b, VU1)(ctx.bind(x, ctx.eval(et), VU1))
+        Pi(x, et, U1, eb, U1)
+      case (S.Pi(x, t, b), VUFun()) =>
+        val et = checkType(t, VUVal())
+        val (eb, u2, _) = inferType(b)(ctx.bind(x, ctx.eval(et), VUVal()))
+        force(u2) match
+          case VU1 => throw ElaborateError(s"invalid universes: $tm")
+          case _   =>
+        Pi(x, et, ctx.quote(VUVal()), eb, ctx.quote(u2))
 
       // case (S.Lift(ty), VType(S1)) =>
       //  Lift(checkType(ty, S0(RVal)))
@@ -238,7 +204,7 @@ object Elaboration:
       case S.Var(Name("Val")) => (VFVal, VVF, VU1)
       case S.Var(Name("Fun")) => (VFFun, VVF, VU1)
       case S.Var(Name("U1"))  => (U1, VU1, VU1)
-      case S.Var(Name("U0"))  => (U0, vpi("_", VVF, _ => VU1), VU1)
+      case S.Var(Name("U0"))  => (U0, vpi("_", VVF, VU1, VU1, _ => VU1), VU1)
       case S.App(S.Var(Name("fst")), t) =>
         val (et, vt, st) = infer(t)
         force(vt) match
@@ -257,7 +223,7 @@ object Elaboration:
       case S.Var(Name("S")) =>
         (
           Lam(DoBind(Name("x")), NatS(Local(ix0))),
-          VFun(VNat, VUVal(), VNat),
+          vpi("_", VNat, VUVal(), VUVal(), _ => VNat),
           VUFun()
         )
       /*
@@ -272,7 +238,13 @@ object Elaboration:
         val (ez, vt) = infer(z, VUVal())
         val es = check(
           s,
-          VFun(VNat, VUFun(), VFun(vt, VUVal(), vt)),
+          vpi(
+            "_",
+            VNat,
+            VUVal(),
+            VUFun(),
+            _ => vpi("_", vt, VUVal(), VUVal(), _ => vt)
+          ),
           VUFun()
         )
         (App(App(App(FoldNat(ctx.quote(vt)), en), ez), es), vt, VUVal())
@@ -291,26 +263,28 @@ object Elaboration:
         val (ev, et, vt) = inferValue(v, t, ctx.eval(eu))
         val (eb, rty, st2) = infer(b)(ctx.define(x, vt, veu, ctx.eval(ev)))
         (Let(x, eu, et, ev, eb), rty, st2)
-      case S.Fun(a, b) =>
-        val ea = checkType(a, VUVal())
-        val (eb, vt, ub) = inferType(b)
-        force(vt) match
-          case VU1 => throw ElaborateError(s"=> return type cannot be in U1")
-          case _   =>
-        (Fun(ea, ctx.quote(vt), eb), VUFun(), VU1)
       case S.Pi(x, t, b) =>
-        val et = checkType(t, VU1)
-        val eb = checkType(b, VU1)(ctx.bind(x, ctx.eval(et), VU1))
-        (Pi(x, et, eb), VU1, VU1)
+        val (et, u1, _) = inferType(t)
+        val (eb, u2) = force(u1) match
+          case VU1 =>
+            val eb = checkType(b, VU1)(ctx.bind(x, ctx.eval(et), VU1))
+            (eb, VU1)
+          case _ =>
+            val (eb, u2, _) = inferType(b)(ctx.bind(x, ctx.eval(et), u1))
+            (eb, u2)
+        debug(s"pi univs: $tm ~> (${ctx.pretty(u1)}, ${ctx.pretty(u2)})")
+        val u3 = (force(u1), force(u2)) match
+          case (VU1, VU1)         => VU1
+          case (VUVal(), VUFun()) => VUFun()
+          case (VUVal(), VUVal()) => VUFun()
+          case _ => throw ElaborateError(s"incompatible universes in pi: $tm")
+        (Pi(x, et, ctx.quote(u1), eb, ctx.quote(u2)), u3, VU1)
       case S.App(f, a) =>
         val (ef, fty, st) = infer(f)
         force(fty) match
-          case VFun(t1, u, t2) =>
-            val ea = check(a, t1, VUVal())
-            (App(ef, ea), t2, u)
-          case VPi(_, t, b) =>
-            val ea = check(a, t, VU1)
-            (App(ef, ea), b(ctx.eval(ea)), VU1)
+          case VPi(_, t, u1, b, u2) =>
+            val ea = check(a, t, u1)
+            (App(ef, ea), b(ctx.eval(ea)), u2)
           case _ =>
             throw ElaborateError(
               s"pi expected in $tm but got: ${ctx.pretty(fty)}"

@@ -9,4 +9,4 @@ mul1 : Nat1 -> Nat1 -> Nat1 = \b a A z s. a A z (\x. b A x s);
 up : Nat -> Nat1 = \n A z s. foldNat n z (\_ r. s r);
 down : Nat1 -> Nat = \n. n Nat Z S;
 
-test : Nat => Nat := \n. down (add1 (S1 Z1) (mul1 (S1 (S1 Z1)) (up n)));
+test : Nat -> Nat := \n. down (add1 (S1 Z1) (mul1 (S1 (S1 Z1)) (up n)));

@@ -5,13 +5,12 @@ import Syntax.*
 
 object Pretty:
   private def prettyPi(tm: Tm)(implicit ns: List[Name]): String = tm match
-    case Pi(DontBind, t, b) =>
+    case Pi(DontBind, t, _, b, _) =>
       s"${prettyParen(t, true)} -> ${prettyPi(b)(DontBind.toName :: ns)}"
-    case Pi(DoBind(x0), t, b) =>
+    case Pi(DoBind(x0), t, _, b, _) =>
       val x = x0.fresh
       s"($x : ${pretty(t)}) -> ${prettyPi(b)(x :: ns)}"
-    case Fun(a, _, b) => s"${prettyParen(a, true)} => ${prettyPi(b)}"
-    case rest         => pretty(rest)
+    case rest => pretty(rest)
 
   private def prettyLam(tm: Tm)(implicit ns: List[Name]): String =
     def go(tm: Tm, ns: List[Name], first: Boolean = false): String = tm match
@@ -81,10 +80,9 @@ object Pretty:
     case U0    => "U0"
     case U1    => "U1"
 
-    case Pi(_, _, _)  => prettyPi(tm)
-    case Fun(_, _, _) => prettyPi(tm)
-    case Lam(_, _)    => prettyLam(tm)
-    case App(_, _)    => prettyApp(tm)
+    case Pi(_, _, _, _, _) => prettyPi(tm)
+    case Lam(_, _)         => prettyLam(tm)
+    case App(_, _)         => prettyApp(tm)
 
     case PairTy(fst, snd) => s"($fst ** $snd)"
     case Pair(fst, snd)   => s"($fst, $snd)"
