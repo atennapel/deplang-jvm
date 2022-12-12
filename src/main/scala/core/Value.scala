@@ -22,20 +22,29 @@ object Value:
     case SSnd(spine: Spine)
   export Spine.*
 
+  enum Head:
+    case HVar(lvl: Lvl)
+    case HU0
+  export Head.*
+
   type VTy = Val
   enum Val:
-    case VRigid(head: Lvl, spine: Spine)
+    case VRigid(head: Head, spine: Spine)
     case VGlobal(name: Name, spine: Spine, value: () => Val)
 
-    case VType(stage: Stage)
+    case VVF
+    case VVFVal
+    case VVFFun
+    case VU1
 
-    case VPi(name: Bind, ty: VTy, stage: Stage, body: Clos)
+    case VPi(name: Bind, ty: VTy, body: Clos)
+    case VFun(left: VTy, vf: VTy, right: VTy)
     case VLam(name: Bind, body: Clos)
 
     case VPairTy(fst: VTy, snd: VTy)
     case VPair(fst: Val, snd: Val)
 
-    case VLift(rep: Rep, tm: VTy)
+    case VLift(vf: VTy, tm: VTy)
     case VQuote(tm: Val)
 
     case VNat
@@ -46,11 +55,35 @@ object Value:
   private def name(x: String): Bind =
     if x == "_" then DontBind else DoBind(Name(x))
   def vlam(x: String, f: Val => Val): Val = VLam(name(x), CFun(f))
-  def vpi(x: String, t: Val, st: Stage, f: Val => Val): Val =
-    VPi(name(x), t, st, CFun(f))
+  def vpi(x: String, t: Val, f: Val => Val): Val =
+    VPi(name(x), t, CFun(f))
 
   object VVar:
-    def apply(lvl: Lvl) = VRigid(lvl, SId)
+    def apply(lvl: Lvl) = VRigid(HVar(lvl), SId)
     def unapply(value: Val): Option[Lvl] = value match
-      case VRigid(hd, SId) => Some(hd)
-      case _               => None
+      case VRigid(HVar(hd), SId) => Some(hd)
+      case _                     => None
+
+  object VU0:
+    def apply() = VRigid(HU0, SId)
+    def unapply(value: Val): Boolean = value match
+      case VRigid(HU0, SId) => true
+      case _                => false
+
+  object VU:
+    def apply(vf: VTy) = VRigid(HU0, SApp(SId, vf))
+    def unapply(value: Val): Option[VTy] = value match
+      case VRigid(HU0, SApp(SId, vf)) => Some(vf)
+      case _                          => None
+
+  object VUVal:
+    def apply() = VRigid(HU0, SApp(SId, VVFVal))
+    def unapply(value: Val): Boolean = value match
+      case VRigid(HU0, SApp(SId, VVFVal)) => true
+      case _                              => false
+
+  object VUFun:
+    def apply() = VRigid(HU0, SApp(SId, VVFFun))
+    def unapply(value: Val): Boolean = value match
+      case VRigid(HU0, SApp(SId, VVFFun)) => true
+      case _                              => false

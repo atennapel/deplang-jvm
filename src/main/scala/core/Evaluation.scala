@@ -59,20 +59,25 @@ object Evaluation:
         case None => impossible()
     case Let(_, _, _, v, b) => eval(b)(eval(v) :: env)
 
-    case Type(s) => VType(s)
+    case VF    => VVF
+    case VFVal => VVFVal
+    case VFFun => VVFFun
+    case U0    => VU0()
+    case U1    => VU1
 
-    case Pi(x, t, st, b) => VPi(x, eval(t), st, Clos(b))
-    case Lam(x, b)       => VLam(x, Clos(b))
-    case App(f, a)       => vapp(eval(f), eval(a))
+    case Pi(x, t, b)   => VPi(x, eval(t), Clos(b))
+    case Fun(a, vf, b) => VFun(eval(a), eval(vf), eval(b))
+    case Lam(x, b)     => VLam(x, Clos(b))
+    case App(f, a)     => vapp(eval(f), eval(a))
 
     case PairTy(fst, snd) => VPairTy(eval(fst), eval(snd))
     case Pair(fst, snd)   => VPair(eval(fst), eval(snd))
     case Fst(t)           => vfst(eval(t))
     case Snd(t)           => vsnd(eval(t))
 
-    case Lift(rep, t) => VLift(rep, eval(t))
-    case Quote(t)     => vquote(eval(t))
-    case Splice(t)    => vsplice(eval(t))
+    case Lift(vf, t) => VLift(eval(vf), eval(t))
+    case Quote(t)    => vquote(eval(t))
+    case Splice(t)   => vsplice(eval(t))
 
     case Wk(t) => eval(t)(env.tail)
 
@@ -111,21 +116,31 @@ object Evaluation:
   private def quote(b: Clos, unfold: Unfold)(implicit k: Lvl): Tm =
     quote(b(VVar(k)), unfold)(k + 1)
 
+  def quote(h: Head)(implicit k: Lvl): Tm = h match
+    case HVar(l) => Local(l.toIx)
+    case HU0     => U0
+
   def quote(v: Val, unfold: Unfold = UnfoldNone)(implicit k: Lvl): Tm =
     force(v, unfold) match
-      case VRigid(hd, sp)    => quote(Local(hd.toIx), sp, unfold)
+      case VRigid(hd, sp)    => quote(quote(hd), sp, unfold)
       case VGlobal(x, sp, v) => quote(Global(x), sp, unfold)
 
-      case VType(s) => Type(s)
+      case VVF    => VF
+      case VVFVal => VFVal
+      case VVFFun => VFFun
+      case VU0()  => U0
+      case VU1    => U1
 
-      case VPi(x, t, st, b) => Pi(x, quote(t, unfold), st, quote(b, unfold))
-      case VLam(x, b)       => Lam(x, quote(b, unfold))
+      case VPi(x, t, b) => Pi(x, quote(t, unfold), quote(b, unfold))
+      case VFun(a, vf, b) =>
+        Fun(quote(a, unfold), quote(vf, unfold), quote(b, unfold))
+      case VLam(x, b) => Lam(x, quote(b, unfold))
 
       case VPairTy(fst, snd) => PairTy(quote(fst, unfold), quote(snd, unfold))
       case VPair(fst, snd)   => Pair(quote(fst, unfold), quote(snd, unfold))
 
-      case VLift(rep, v) => Lift(rep, quote(v, unfold))
-      case VQuote(v)     => Quote(quote(v, unfold))
+      case VLift(vf, v) => Lift(quote(vf, unfold), quote(v, unfold))
+      case VQuote(v)    => Quote(quote(v, unfold))
 
       case VNat  => Nat
       case VZ    => Z

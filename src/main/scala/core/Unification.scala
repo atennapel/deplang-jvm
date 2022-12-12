@@ -24,14 +24,18 @@ object Unification:
   def unify(a: Val, b: Val)(implicit k: Lvl): Unit =
     debug(s"unify ${quote(a)} ~ ${quote(b)}")
     (force(a, UnfoldNone), force(b, UnfoldNone)) match
-      case (VType(s1), VType(s2)) if s1 == s2 => ()
-      case (VNat, VNat)                       => ()
-      case (VZ, VZ)                           => ()
-      case (VS(n), VS(m))                     => unify(n, m)
-      case (VLift(_, a), VLift(_, b))         => unify(a, b)
-      case (VQuote(a), VQuote(b))             => unify(a, b)
-      case (VPi(_, t1, _, b1), VPi(_, t2, _, b2)) =>
-        unify(t1, t2); unify(b1, b2)
+      case (VVF, VVF)                       => ()
+      case (VVFVal, VVFVal)                 => ()
+      case (VVFFun, VVFFun)                 => ()
+      case (VU1, VU1)                       => ()
+      case (VNat, VNat)                     => ()
+      case (VZ, VZ)                         => ()
+      case (VS(n), VS(m))                   => unify(n, m)
+      case (VLift(_, a), VLift(_, b))       => unify(a, b)
+      case (VQuote(a), VQuote(b))           => unify(a, b)
+      case (VPi(_, t1, b1), VPi(_, t2, b2)) => unify(t1, t2); unify(b1, b2)
+      case (VFun(a1, vf1, b1), VFun(a2, vf2, b2)) =>
+        unify(a1, a2); unify(vf1, vf2); unify(b1, b2)
       case (VPair(a1, b1), VPair(a2, b2))     => unify(a1, a2); unify(b1, b2)
       case (VPairTy(a1, b1), VPairTy(a2, b2)) => unify(a1, a2); unify(b1, b2)
       case (VRigid(h1, sp1), VRigid(h2, sp2)) if h1 == h2 => unify(sp1, sp2)

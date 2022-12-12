@@ -7,11 +7,16 @@ object Syntax:
   enum Tm:
     case Local(ix: Ix)
     case Global(name: Name)
-    case Let(name: Name, stage: Stage, ty: Ty, value: Tm, body: Tm)
+    case Let(name: Name, univ: Ty, ty: Ty, value: Tm, body: Tm)
 
-    case Type(stage: Stage)
+    case VF
+    case VFVal
+    case VFFun
+    case U0
+    case U1
 
-    case Pi(name: Bind, ty: Ty, stage: Stage, body: Ty)
+    case Pi(name: Bind, ty: Ty, body: Ty)
+    case Fun(left: Ty, vf: Ty, right: Ty)
     case Lam(name: Bind, body: Tm)
     case App(fn: Tm, arg: Tm)
 
@@ -20,7 +25,7 @@ object Syntax:
     case Fst(tm: Tm)
     case Snd(tm: Tm)
 
-    case Lift(rep: Rep, tm: Ty)
+    case Lift(vf: Ty, tm: Ty)
     case Quote(tm: Tm)
     case Splice(tm: Tm)
 
@@ -34,17 +39,26 @@ object Syntax:
     override def toString: String = this match
       case Local(x)  => s"'$x"
       case Global(x) => s"$x"
-      case Let(x, s, t, v, b) =>
-        s"(let $x : $t ${s.split(_ => ":", "")}= $v in $b)"
+      case Let(x, App(U0, VFVal), t, v, b) =>
+        s"(let $x : $t ::= $v in $b)"
+      case Let(x, App(U0, VFFun), t, v, b) =>
+        s"(let $x : $t := $v in $b)"
+      case Let(x, U1, t, v, b) =>
+        s"(let $x : $t = $v in $b)"
+      case Let(x, _, t, v, b) =>
+        s"(let $x : $t ?= $v in $b)"
 
-      case Type(S1)       => s"Type1"
-      case Type(S0(RVal)) => s"Type"
-      case Type(S0(rep))  => s"(Type $rep)"
+      case VF    => s"VF"
+      case VFVal => s"Val"
+      case VFFun => s"Fun"
+      case U0    => s"U0"
+      case U1    => s"U1"
 
-      case Pi(DontBind, t, _, b)  => s"($t -> $b)"
-      case Pi(DoBind(x), t, _, b) => s"(($x : $t) -> $b)"
-      case Lam(x, b)              => s"(\\$x. $b)"
-      case App(f, a)              => s"($f $a)"
+      case Pi(DontBind, t, b)  => s"($t -> $b)"
+      case Pi(DoBind(x), t, b) => s"(($x : $t) -> $b)"
+      case Fun(a, _, b)        => s"($a => $b)"
+      case Lam(x, b)           => s"(\\$x. $b)"
+      case App(f, a)           => s"($f $a)"
 
       case PairTy(fst, snd) => s"($fst ** $snd)"
       case Pair(fst, snd)   => s"($fst, $snd)"
@@ -76,8 +90,11 @@ object Syntax:
     def toList: List[Def] = defs
 
   enum Def:
-    case DDef(name: Name, stage: Stage, ty: Ty, value: Tm)
+    case DDef(name: Name, vf: Ty, ty: Ty, value: Tm)
 
     override def toString: String = this match
-      case DDef(x, s, t, v) => s"$x : $t ${s.split(_ => ":", "")}= $v;"
+      case DDef(x, App(U0, VFVal), t, v) => s"$x : $t ::= $v"
+      case DDef(x, App(U0, VFFun), t, v) => s"$x : $t := $v"
+      case DDef(x, U1, t, v)             => s"$x : $t = $v"
+      case DDef(x, _, t, v)              => s"$x : $t ?= $v"
   export Def.*
