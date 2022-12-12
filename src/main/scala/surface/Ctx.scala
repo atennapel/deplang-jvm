@@ -7,7 +7,7 @@ import core.Evaluation.{quote as quote0, eval as eval0}
 import core.Pretty.{pretty as pretty0}
 import scala.annotation.tailrec
 
-type Types = List[(Name, Lvl, VTy, Stage)]
+type Types = List[(Name, Lvl, VTy, VTy)]
 
 final case class Ctx(
     lvl: Lvl,
@@ -18,28 +18,28 @@ final case class Ctx(
 ):
   def enter(pos: PosInfo): Ctx = copy(pos = pos)
 
-  def bind(x: Bind, ty: VTy, st: Stage): Ctx = x match
+  def bind(x: Bind, ty: VTy, univ: VTy): Ctx = x match
     case DontBind =>
       copy(lvl = lvl + 1, env = VVar(lvl) :: env, names = x.toName :: names)
     case DoBind(y) =>
       copy(
         lvl = lvl + 1,
         env = VVar(lvl) :: env,
-        types = (y, lvl, ty, st) :: types,
+        types = (y, lvl, ty, univ) :: types,
         names = x.toName :: names
       )
 
-  def define(x: Name, ty: VTy, st: Stage, value: Val): Ctx =
+  def define(x: Name, ty: VTy, univ: VTy, value: Val): Ctx =
     copy(
       lvl = lvl + 1,
       env = value :: env,
-      types = (x, lvl, ty, st) :: types,
+      types = (x, lvl, ty, univ) :: types,
       names = x :: names
     )
 
-  def lookup(x: Name): Option[(Ix, VTy, Stage)] =
+  def lookup(x: Name): Option[(Ix, VTy, VTy)] =
     @tailrec
-    def go(ts: Types): Option[(Ix, VTy, Stage)] = ts match
+    def go(ts: Types): Option[(Ix, VTy, VTy)] = ts match
       case Nil                           => None
       case (y, k, ty, st) :: _ if x == y => Some((k.toIx(lvl), ty, st))
       case _ :: ts                       => go(ts)

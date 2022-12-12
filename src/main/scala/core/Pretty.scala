@@ -5,9 +5,9 @@ import Syntax.*
 
 object Pretty:
   private def prettyPi(tm: Tm)(implicit ns: List[Name]): String = tm match
-    case Pi(DontBind, t, _, b) =>
+    case Pi(DontBind, t, _, b, _) =>
       s"${prettyParen(t, true)} -> ${prettyPi(b)(DontBind.toName :: ns)}"
-    case Pi(DoBind(x0), t, _, b) =>
+    case Pi(DoBind(x0), t, _, b, _) =>
       val x = x0.fresh
       s"($x : ${pretty(t)}) -> ${prettyPi(b)(x :: ns)}"
     case rest => pretty(rest)
@@ -41,8 +41,11 @@ object Pretty:
   ): String = tm match
     case Local(_)          => pretty(tm)
     case Global(_)         => pretty(tm)
-    case Type(S1)          => pretty(tm)
-    case Type(S0(RVal))    => pretty(tm)
+    case VF                => pretty(tm)
+    case VFVal             => pretty(tm)
+    case VFFun             => pretty(tm)
+    case U0                => pretty(tm)
+    case U1                => pretty(tm)
     case App(_, _) if app  => pretty(tm)
     case S(_) if app       => pretty(tm)
     case S(_)              => toNat(tm).fold(s"(${pretty(tm)})")(n => s"$n")
@@ -62,19 +65,24 @@ object Pretty:
   def pretty(tm: Tm)(implicit ns: List[Name]): String = tm match
     case Local(ix) => s"${ns(ix.expose)}"
     case Global(x) => s"$x"
-    case Let(x0, s, t, v, b) =>
+    case Let(x0, u, t, v, b) =>
       val x = x0.fresh
-      s"let $x : ${pretty(t)} ${s
-          .split(_ => ":", "")}= ${pretty(v)} in ${pretty(b)(x :: ns)}"
+      val s = u match
+        case App(U0, VFVal) => "::"
+        case App(U0, VFFun) => ":"
+        case U1             => ""
+        case _              => "?"
+      s"let $x : ${pretty(t)} $s= ${pretty(v)} in ${pretty(b)(x :: ns)}"
 
-    case Type(S1)          => "Type1"
-    case Type(S0(RVal))    => "Type"
-    case Type(S0(RFun))    => "Type Fun"
-    case Type(S0(RErased)) => "Type Erased"
+    case VF    => "VF"
+    case VFVal => "Val"
+    case VFFun => "Fun"
+    case U0    => "U0"
+    case U1    => "U1"
 
-    case Pi(_, _, _, _) => prettyPi(tm)
-    case Lam(_, _)      => prettyLam(tm)
-    case App(_, _)      => prettyApp(tm)
+    case Pi(_, _, _, _, _) => prettyPi(tm)
+    case Lam(_, _)         => prettyLam(tm)
+    case App(_, _)         => prettyApp(tm)
 
     case PairTy(fst, snd) => s"($fst ** $snd)"
     case Pair(fst, snd)   => s"($fst, $snd)"
@@ -93,9 +101,14 @@ object Pretty:
     case FoldNat(t) => s"foldNat {${pretty(t)}}"
 
   def pretty(d: Def)(implicit ns: List[Name]): String = d match
-    case DDef(x0, s, t, v) =>
+    case DDef(x0, u, t, v) =>
       val x = x0.fresh
-      s"$x : ${pretty(t)} ${s.split(_ => ":", "")}= ${pretty(v)(x :: ns)};"
+      val s = u match
+        case App(U0, VFVal) => "::"
+        case App(U0, VFFun) => ":"
+        case U1             => ""
+        case _              => "?"
+      s"$x : ${pretty(t)} $s= ${pretty(v)(x :: ns)};"
 
   def pretty(ds: Defs)(implicit ns: List[Name]): String =
     ds.toList.map(pretty).mkString("\n")

@@ -1,4 +1,4 @@
-(<<) : (A B C : ^Type) -> (B -> C) -> (A -> B) -> A -> C =
+(<<) : (A B C : U0 Val) -> (B -> C) -> (A -> B) -> A -> C =
   \A B C f g x. f (g x);
 
 (+) : Nat -> Nat -> Nat := \a b. foldNat a b (\_ r. S r);

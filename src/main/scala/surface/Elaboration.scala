@@ -21,60 +21,66 @@ object Elaboration:
           s"cannot unify: ${ctx.pretty(a)} ~ ${ctx.pretty(b)}: ${e.msg}"
         )
 
-  private def inferValue(v: S.Tm, t: Option[S.Ty], st: Stage)(implicit
+  private def inferValue(v: S.Tm, t: Option[S.Ty], u: VTy)(implicit
       ctx: Ctx
   ): (Tm, Ty, VTy) = t match
     case None =>
-      val (etm, vty) = infer(v, st)
+      val (etm, vty) = infer(v, u)
       (etm, ctx.quote(vty), vty)
     case Some(ty) =>
-      val ety = checkType(ty, st)
+      val ety = checkType(ty, u)
       val vty = ctx.eval(ety)
-      val etm = check(v, vty, st)
+      val etm = check(v, vty, u)
       (etm, ety, vty)
 
-  private def checkType(t: S.Ty, st: Stage)(implicit ctx: Ctx): Ty =
-    check(t, VType(st), st.split(_ => S0(RErased), S1))
+  private def checkType(t: S.Ty, u: VTy)(implicit ctx: Ctx): Ty =
+    check(t, u, VU1)
 
-  private def inferType(t: S.Ty)(implicit ctx: Ctx): (Ty, Stage) =
-    val (et, vt, st) = infer(t)
+  private def inferType(t: S.Ty)(implicit ctx: Ctx): (Ty, VTy, VTy) =
+    val (et, vt, u) = infer(t)
     force(vt) match
-      case VType(st) => (et, st)
+      case VU1    => (et, vt, u)
+      case VU(vf) => (et, vt, u)
       case _ =>
         throw ElaborateError(s"expected type for $t, but got ${ctx.pretty(vt)}")
 
-  private def tryAdjustStage(t: Tm, a: VTy, st1: Stage, st2: Stage)(implicit
+  private def tryAdjustStage(t: Tm, a: VTy, st1: VTy, st2: VTy)(implicit
       ctx: Ctx
   ): Option[(Tm, VTy)] =
     debug(
-      s"tryAdjustStage ${ctx.pretty(t)} : ${ctx.pretty(a)} from $st1 to $st2"
+      s"tryAdjustStage ${ctx.pretty(t)} : ${ctx.pretty(a)} from ${ctx
+          .pretty(st1)} to ${ctx.pretty(st2)}"
     )
-    (st1, st2) match
-      case _ if st1 == st2 => None
-      case (S0(rep), S1)   => Some(tQuote(t), VLift(rep, a))
-      case (S1, S0(rep)) =>
+    (force(st1), force(st2)) match
+      case (v1, v2) if v1 == v2 => None
+      case (VU(vf), VU1)        => Some(tQuote(t), VLift(vf, a))
+      case (VU1, VU(vf)) =>
         force(a) match
-          case VLift(rep2, a) if rep == rep2 => Some(tSplice(t), a)
-          case _ =>
+          case VLift(vf2, a) if vf == vf2 => Some(tSplice(t), a)
+          case ty =>
             throw ElaborateError(
-              s"cannot adjust stage of ${ctx.pretty(t)}, from $st1 to $st2"
+              s"cannot adjust stage (1) of ${ctx.pretty(t)}, from ${ctx
+                  .pretty(st1)} to ${ctx.pretty(st2)}, got ${ctx.pretty(ty)}"
             )
       case _ =>
         throw ElaborateError(
-          s"cannot adjust stage of ${ctx.pretty(t)}, from $st1 to $st2"
+          s"cannot adjust stage (2) of ${ctx.pretty(t)}, from ${ctx
+              .pretty(st1)} to ${ctx.pretty(st2)}"
         )
 
-  private def adjustStage(t: Tm, a: VTy, st1: Stage, st2: Stage)(implicit
+  private def adjustStage(t: Tm, a: VTy, st1: VTy, st2: VTy)(implicit
       ctx: Ctx
   ): (Tm, VTy) =
-    debug(s"adjustStage ${ctx.pretty(t)} : ${ctx.pretty(a)} from $st1 to $st2")
+    debug(s"adjustStage ${ctx.pretty(t)} : ${ctx.pretty(a)} from ${ctx
+        .pretty(st1)} to ${ctx.pretty(st2)}")
     tryAdjustStage(t, a, st1, st2).getOrElse((t, a))
 
-  private def coe(t: Tm, a: VTy, st1: Stage, b: VTy, st2: Stage)(implicit
+  private def coe(t: Tm, a: VTy, st1: VTy, b: VTy, st2: VTy)(implicit
       ctx: Ctx
   ): Tm =
     debug(
-      s"coeTop ${ctx.pretty(t)} : ${ctx.pretty(a)} : $st1 to ${ctx.pretty(b)} : $st2"
+      s"coeTop ${ctx.pretty(t)} : ${ctx.pretty(a)} : ${ctx.pretty(st1)} to ${ctx
+          .pretty(b)} : ${ctx.pretty(st2)}"
     )
     def pick(x: Bind, y: Bind)(implicit ctx: Ctx): Bind = ctx.fresh((x, y) match
       case (DontBind, DontBind) => DoBind(Name("x"))
@@ -82,7 +88,7 @@ object Elaboration:
       case (x, DontBind)        => x
       case (_, x)               => x
     )
-    def justAdjust(t: Tm, a: VTy, st1: Stage, b: VTy, st2: Stage)(implicit
+    def justAdjust(t: Tm, a: VTy, st1: VTy, b: VTy, st2: VTy)(implicit
         ctx: Ctx
     ): Option[Tm] =
       tryAdjustStage(t, a, st1, st2) match
@@ -91,132 +97,134 @@ object Elaboration:
     def go(
         t: Tm,
         a: VTy,
-        st1: Stage,
+        st1: VTy,
         b: VTy,
-        st2: Stage
+        st2: VTy
     )(implicit ctx: Ctx): Option[Tm] =
       debug(
-        s"coe ${ctx.pretty(t)} : ${ctx.pretty(a)} : $st1 to ${ctx.pretty(b)} : $st2"
+        s"coe ${ctx.pretty(t)} : ${ctx.pretty(a)} : ${ctx.pretty(st1)} to ${ctx
+            .pretty(b)} : ${ctx.pretty(st2)}"
       )
       (force(a), force(b)) match
-        case (VPi(x1, a1, rst1, b1), VPi(x2, a2, rst2, b2)) =>
-          val ctx2 = ctx.bind(x1, a2, st2)
-          val std1 = rst1.split(_ => S0(RVal), S1)
-          val std2 = rst2.split(_ => S0(RVal), S1)
-          val coev0 = go(Local(ix0), a2, std2, a1, std1)(ctx2)
+        case (VPi(x1, a1, u11, b1, u12), VPi(x2, a2, u21, b2, u22)) =>
+          val ctx2 = ctx.bind(x1, a2, u21)
+          val coev0 = go(Local(ix0), a2, u21, a1, u11)(ctx2)
           coev0 match
             case None =>
               val body = go(
                 App(Wk(t), Local(ix0)),
                 b1(VVar(ctx.lvl)),
-                rst1,
+                u12,
                 b2(VVar(ctx.lvl)),
-                rst2
+                u22
               )(ctx2)
               body.map(Lam(x1, _))
             case Some(coev0) =>
               val body = go(
                 App(Wk(t), coev0),
                 b1(ctx2.eval(coev0)),
-                rst1,
+                u12,
                 b2(VVar(ctx.lvl)),
-                rst2
+                u22
               )(ctx2)
               body match
                 case None       => Some(Lam(pick(x1, x2), App(Wk(t), coev0)))
                 case Some(body) => Some(Lam(pick(x1, x2), body))
-        case (VType(S0(rep)), VType(S1)) => Some(Lift(rep, t))
+        case (VU(vf), VU1) => Some(Lift(ctx.quote(vf), t))
         case (VLift(r1, a), VLift(r2, b)) =>
           if r1 != r2 then throw ElaborateError(s"Rep mismatch $r1 != $r2")
           unify(a, b)
           None
-        case (VLift(rep, a), b) => Some(coe(tSplice(t), a, S0(rep), b, st2))
-        case (a, VLift(rep, b)) => Some(tQuote(coe(t, a, st1, b, S0(rep))))
-        case _                  => justAdjust(t, a, st1, b, st2)
+        case (VLift(vf, a), b) => Some(coe(tSplice(t), a, VU(vf), b, st2))
+        case (a, VLift(vf, b)) => Some(tQuote(coe(t, a, st1, b, VU(vf))))
+        case _                 => justAdjust(t, a, st1, b, st2)
     go(t, a, st1, b, st2).getOrElse(t)
 
-  private def check(tm: S.Tm, ty: VTy, st: Stage)(implicit ctx: Ctx): Tm =
-    if !tm.isPos then debug(s"check $tm : ${ctx.pretty(ty)}")
+  private def check(tm: S.Tm, ty: VTy, univ: VTy)(implicit ctx: Ctx): Tm =
+    if !tm.isPos then
+      debug(s"check $tm : ${ctx.pretty(ty)} : ${ctx.pretty(univ)}")
     (tm, force(ty)) match
-      case (S.Pos(pos, tm), _) => check(tm, ty, st)(ctx.enter(pos))
+      case (S.Pos(pos, tm), _) => check(tm, ty, univ)(ctx.enter(pos))
       case (S.Hole(x), _) =>
         throw ElaborateError(
           s"hole found _${x.getOrElse("")} : ${ctx.pretty(ty)}"
         )
-      case (S.Lam(x, b), VPi(_, t, rst @ S0(_), rt)) =>
-        val eb = check(b, rt(VVar(ctx.lvl)), rst)(ctx.bind(x, t, S0(RVal)))
+      case (S.Lam(x, b), VPi(_, t, u1, rt, u2)) =>
+        val eb = check(b, rt(VVar(ctx.lvl)), u2)(ctx.bind(x, t, u1))
         Lam(x, eb)
-      case (S.Lam(x, b), VPi(_, t, rst, rt)) =>
-        val eb = check(b, rt(VVar(ctx.lvl)), rst)(ctx.bind(x, t, st))
-        Lam(x, eb)
+
+      case (S.Pi(x, t, b), VU1) =>
+        val et = checkType(t, VU1)
+        val eb = checkType(b, VU1)(ctx.bind(x, ctx.eval(et), VU1))
+        Pi(x, et, U1, eb, U1)
+      case (S.Pi(x, t, b), VUFun()) =>
+        val et = checkType(t, VUVal())
+        val (eb, u2, _) = inferType(b)(ctx.bind(x, ctx.eval(et), VUVal()))
+        force(u2) match
+          case VU1 => throw ElaborateError(s"invalid universes: $tm")
+          case _   =>
+        Pi(x, et, ctx.quote(VUVal()), eb, ctx.quote(u2))
 
       // case (S.Lift(ty), VType(S1)) =>
       //  Lift(checkType(ty, S0(RVal)))
 
-      case (S.Pi(x, t, b), VType(S1)) =>
-        val et = checkType(t, S1)
-        val eb = checkType(b, S1)(ctx.bind(x, ctx.eval(et), S1))
-        Pi(x, et, S1, eb)
-      case (S.Pi(x, t, b), VType(S0(RFun))) =>
-        val et = checkType(t, S0(RVal))
-        val (eb, st) = inferType(b)(ctx.bind(x, ctx.eval(et), S0(RVal)))
-        st match
-          case S1    => throw ElaborateError(s"wrong staging: $tm")
-          case S0(_) =>
-        Pi(x, et, st, eb)
+      case (S.Quote(t), VLift(vf, ty)) =>
+        tQuote(check(t, ty, VU(vf)))
+      case (t, VLift(vf, ty)) =>
+        tQuote(check(t, ty, VU(vf)))
 
-      case (S.Quote(t), VLift(rep, ty)) =>
-        tQuote(check(t, ty, S0(rep)))
-      case (t, VLift(rep, ty)) =>
-        tQuote(check(t, ty, S0(rep)))
-
-      case (S.Let(x, st2, ot, v, b), _) if st2 == st =>
-        val (ev, et, vt) = inferValue(v, ot, st2)
-        val eb = check(b, ty, st)(ctx.define(x, vt, st2, ctx.eval(ev)))
-        Let(x, st, et, ev, eb)
+      case (S.Let(x, univ2, ot, v, b), _) if univ == univ2 =>
+        val (ev, et, vt) = inferValue(v, ot, univ)
+        val eb = check(b, ty, univ)(ctx.define(x, vt, univ, ctx.eval(ev)))
+        Let(x, ctx.quote(univ), et, ev, eb)
 
       case (tm, _) =>
-        val (etm, ty2, st2) = infer(tm)
-        debug(s"check inferred ${ctx.pretty(etm)} : ${ctx.pretty(ty2)} : $st2")
-        coe(etm, ty2, st2, ty, st)
+        val (etm, ty2, univ2) = infer(tm)
+        debug(
+          s"check inferred ${ctx.pretty(etm)} : ${ctx.pretty(ty2)} : ${ctx.pretty(univ2)}"
+        )
+        coe(etm, ty2, univ2, ty, univ)
 
-  private def infer(tm: S.Tm, st: Stage)(implicit ctx: Ctx): (Tm, VTy) =
-    if !tm.isPos then debug(s"inferS $tm : $st")
+  private def infer(tm: S.Tm, univ: VTy)(implicit ctx: Ctx): (Tm, VTy) =
+    if !tm.isPos then debug(s"inferS $tm : ${ctx.pretty(univ)}")
     tm match
-      case S.Pos(pos, tm) => infer(tm, st)(ctx.enter(pos))
+      case S.Pos(pos, tm) => infer(tm, univ)(ctx.enter(pos))
       case tm =>
-        val (et, vt, st2) = infer(tm)
+        val (et, vt, univ2) = infer(tm)
         debug(s"inferred ${ctx.pretty(et)}")
-        val (et2, vt2) = adjustStage(et, vt, st2, st)
+        val (et2, vt2) = adjustStage(et, vt, univ2, univ)
         debug(s"adjusted ${ctx.pretty(et2)}")
         (et2, vt2)
 
-  private def infer(tm: S.Tm)(implicit ctx: Ctx): (Tm, VTy, Stage) =
+  private def infer(tm: S.Tm)(implicit ctx: Ctx): (Tm, VTy, VTy) =
     if !tm.isPos then debug(s"infer $tm")
     tm.removePos match
-      case S.Pos(pos, tm)  => infer(tm)(ctx.enter(pos))
-      case S.Type(S1)      => (Type(S1), VType(S1), S1)
-      case S.Type(S0(rep)) => (Type(S0(rep)), VType(S0(RErased)), S0(RErased))
+      case S.Pos(pos, tm)     => infer(tm)(ctx.enter(pos))
+      case S.Var(Name("VF"))  => (VF, VU1, VU1)
+      case S.Var(Name("Val")) => (VFVal, VVF, VU1)
+      case S.Var(Name("Fun")) => (VFFun, VVF, VU1)
+      case S.Var(Name("U1"))  => (U1, VU1, VU1)
+      case S.Var(Name("U0"))  => (U0, vpi("_", VVF, VU1, VU1, _ => VU1), VU1)
       case S.App(S.Var(Name("fst")), t) =>
         val (et, vt, st) = infer(t)
         force(vt) match
-          case VPairTy(fst, snd) => (Fst(et), fst, S0(RVal))
+          case VPairTy(fst, snd) => (Fst(et), fst, VUVal())
           case _ => throw ElaborateError(s"expected pair type in $tm")
       case S.App(S.Var(Name("snd")), t) =>
         val (et, vt, st) = infer(t)
         force(vt) match
-          case VPairTy(fst, snd) => (Snd(et), snd, S0(RVal))
+          case VPairTy(fst, snd) => (Snd(et), snd, VUVal())
           case _ => throw ElaborateError(s"expected pair type in $tm")
-      case S.Var(Name("Nat")) => (Nat, VType(S0(RVal)), S0(RErased))
-      case S.Var(Name("Z"))   => (Z, VNat, S0(RVal))
+      case S.Var(Name("Nat")) => (Nat, VUVal(), VU1)
+      case S.Var(Name("Z"))   => (Z, VNat, VUVal())
       case S.App(S.Var(Name("S")), n) =>
-        val en = check(n, VNat, S0(RVal))
-        (NatS(en), VNat, S0(RVal))
+        val en = check(n, VNat, VUVal())
+        (NatS(en), VNat, VUVal())
       case S.Var(Name("S")) =>
         (
           Lam(DoBind(Name("x")), NatS(Local(ix0))),
-          VPi(DontBind, VNat, S0(RVal), CClos(Nil, Nat)),
-          S0(RVal)
+          vpi("_", VNat, VUVal(), VUVal(), _ => VNat),
+          VUFun()
         )
       /*
       n : Nat
@@ -226,14 +234,20 @@ object Elaboration:
       foldNat n z s ~> foldNat {A} n z s : A
        */
       case S.App(S.App(S.App(S.Var(Name("foldNat")), n), z), s) =>
-        val en = check(n, VNat, S0(RVal))
-        val (ez, vt) = infer(z, S0(RVal))
+        val en = check(n, VNat, VUVal())
+        val (ez, vt) = infer(z, VUVal())
         val es = check(
           s,
-          vpi("_", VNat, S0(RFun), _ => vpi("_", vt, S0(RVal), _ => vt)),
-          S0(RFun)
+          vpi(
+            "_",
+            VNat,
+            VUVal(),
+            VUFun(),
+            _ => vpi("_", vt, VUVal(), VUVal(), _ => vt)
+          ),
+          VUFun()
         )
-        (App(App(App(FoldNat(ctx.quote(vt)), en), ez), es), vt, S0(RVal))
+        (App(App(App(FoldNat(ctx.quote(vt)), en), ez), es), vt, VUVal())
       case S.Var(Name("foldNat")) =>
         throw ElaborateError(s"foldNat must be fully applied")
       case S.Var(x) =>
@@ -241,69 +255,73 @@ object Elaboration:
           case Some((ix, ty, st)) => (Local(ix), ty, st)
           case None =>
             getGlobal(x) match
-              case Some(e) => (Global(x), e.vty, e.stage)
+              case Some(e) => (Global(x), e.vty, e.univ)
               case None    => throw ElaborateError(s"undefined variable $x")
-      case S.Let(x, st, t, v, b) =>
-        val (ev, et, vt) = inferValue(v, t, st)
-        val (eb, rty, st2) = infer(b)(ctx.define(x, vt, st, ctx.eval(ev)))
-        (Let(x, st, et, ev, eb), rty, st2)
+      case S.Let(x, u, t, v, b) =>
+        val eu = checkType(u, VU1)
+        val veu = ctx.eval(eu)
+        val (ev, et, vt) = inferValue(v, t, ctx.eval(eu))
+        val (eb, rty, st2) = infer(b)(ctx.define(x, vt, veu, ctx.eval(ev)))
+        (Let(x, eu, et, ev, eb), rty, st2)
       case S.Pi(x, t, b) =>
-        val (et, st1) = inferType(t)
-        val (eb, st2) = st1 match
-          case S1 => (checkType(b, S1)(ctx.bind(x, ctx.eval(et), S1)), S1)
-          case _  => inferType(b)(ctx.bind(x, ctx.eval(et), st1))
-        val (rt, st3, st4) = (st1, st2) match
-          case (S1, S1)             => (S1, S1, S1)
-          case (S0(RVal), S0(RVal)) => (S0(RVal), S0(RFun), S0(RErased))
-          case (S0(RVal), S0(RFun)) => (S0(RFun), S0(RFun), S0(RErased))
-          case _ => throw ElaborateError(s"wrong staging: $tm ($st1, $st2)")
-        (Pi(x, et, rt, eb), VType(st3), st4)
+        val (et, u1, _) = inferType(t)
+        val (eb, u2) = force(u1) match
+          case VU1 =>
+            val eb = checkType(b, VU1)(ctx.bind(x, ctx.eval(et), VU1))
+            (eb, VU1)
+          case _ =>
+            val (eb, u2, _) = inferType(b)(ctx.bind(x, ctx.eval(et), u1))
+            (eb, u2)
+        debug(s"pi univs: $tm ~> (${ctx.pretty(u1)}, ${ctx.pretty(u2)})")
+        val u3 = (force(u1), force(u2)) match
+          case (VU1, VU1)         => VU1
+          case (VUVal(), VUFun()) => VUFun()
+          case (VUVal(), VUVal()) => VUFun()
+          case _ => throw ElaborateError(s"incompatible universes in pi: $tm")
+        (Pi(x, et, ctx.quote(u1), eb, ctx.quote(u2)), u3, VU1)
       case S.App(f, a) =>
         val (ef, fty, st) = infer(f)
         force(fty) match
-          case VPi(_, t, S1, b) =>
-            val ea = check(a, t, S1)
-            (App(ef, ea), b(ctx.eval(ea)), S1)
-          case VPi(_, t, S0(rep), b) =>
-            val ea = check(a, t, S0(RVal))
-            (App(ef, ea), b(ctx.eval(ea)), S0(rep))
+          case VPi(_, t, u1, b, u2) =>
+            val ea = check(a, t, u1)
+            (App(ef, ea), b(ctx.eval(ea)), u2)
           case _ =>
             throw ElaborateError(
               s"pi expected in $tm but got: ${ctx.pretty(fty)}"
             )
       case S.Lift(t) =>
-        val (et, st) = inferType(t)
-        val rep = st match
-          case S1 => throw ElaborateError(s"can only lift types in Type: $tm")
-          case S0(rep) => rep
-        (Lift(rep, et), VType(S1), S1)
+        val (et, st, _) = inferType(t)
+        val vf = force(st) match
+          case VU(vf) => vf
+          case _      => throw ElaborateError(s"can only lift types in U0: $tm")
+        (Lift(ctx.quote(vf), et), VU1, VU1)
       case S.Quote(t) =>
         val (et, vt, st) = infer(t)
-        val rep = st match
-          case S0(rep) => rep
-          case S1      => impossible()
-        (tQuote(et), VLift(rep, vt), S1)
+        val vf = force(st) match
+          case VU(vf) => vf
+          case _      => impossible()
+        (tQuote(et), VLift(vf, vt), VU1)
       case S.Splice(t) =>
-        val (et1, vt) = infer(t, S1)
-        val rep = force(vt) match
-          case VLift(rep, _) => rep
+        val (et1, vt) = infer(t, VU1)
+        val vf = force(vt) match
+          case VLift(vf, _) => vf
           case _ => throw ElaborateError(s"expected a lifted type in $tm")
-        val (et2, vt2) = adjustStage(et1, vt, S1, S0(rep))
-        (et2, vt2, S0(rep))
+        val (et2, vt2) = adjustStage(et1, vt, VU1, VU(vf))
+        (et2, vt2, VU(vf))
       case S.PairTy(fst, snd) =>
-        val efst = checkType(fst, S0(RVal))
-        val esnd = checkType(snd, S0(RVal))
-        (PairTy(efst, esnd), VType(S0(RVal)), S0(RErased))
+        val efst = checkType(fst, VUVal())
+        val esnd = checkType(snd, VUVal())
+        (PairTy(efst, esnd), VUVal(), VU1)
       case S.Pair(fst, snd) =>
-        val (efst, t1) = infer(fst, S0(RVal))
-        val (esnd, t2) = infer(snd, S0(RVal))
-        (Pair(efst, esnd), VPairTy(t1, t2), S0(RVal))
+        val (efst, t1) = infer(fst, VUVal())
+        val (esnd, t2) = infer(snd, VUVal())
+        (Pair(efst, esnd), VPairTy(t1, t2), VUVal())
       case _ => throw ElaborateError(s"cannot infer $tm")
 
-  private def elaborate(tm: S.Tm, ty: Option[S.Ty], st: Stage): (Tm, Ty) =
+  private def elaborate(tm: S.Tm, ty: Option[S.Ty], u: VTy): (Tm, Ty) =
     debug(s"elaborate $tm")
     val (etm, ety, _) =
-      inferValue(tm, ty, st)(
+      inferValue(tm, ty, u)(
         Ctx.empty((0, 0))
       ) // TODO: use source position
     (etm, ety)
@@ -311,11 +329,13 @@ object Elaboration:
   def elaborate(d: S.Def): Def =
     debug(s"elaborate $d")
     d match
-      case S.DDef(x, st, t, v) =>
+      case S.DDef(x, u, t, v) =>
         if getGlobal(x).isDefined then
           throw ElaborateError(s"global is already defined: $x")
-        val (ev, et) = elaborate(v, t, st)
-        setGlobal(GlobalEntry(x, ev, et, eval(ev)(Nil), eval(et)(Nil), st))
-        DDef(x, st, et, ev)
+        val eu = checkType(u, VU1)(Ctx.empty((0, 0)))
+        val veu = eval(eu)(Nil)
+        val (ev, et) = elaborate(v, t, veu)
+        setGlobal(GlobalEntry(x, ev, et, eval(ev)(Nil), eval(et)(Nil), veu))
+        DDef(x, eu, et, ev)
 
   def elaborate(ds: S.Defs): Defs = Defs(ds.toList.map(elaborate))

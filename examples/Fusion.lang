@@ -1,7 +1,7 @@
-Nat1 = (A : ^Type) -> A -> (A -> A) -> A;
+Nat1 = (A : U0 Val) -> A -> (A -> A) -> A;
 Z1 : Nat1 = \A z s. z;
 S1 : Nat1 -> Nat1 = \n A z s. s (n A z s);
-foldNat1 : (A : Type) -> Nat1 -> A -> (A -> A) -> A = \A n z s. n A z s;
+foldNat1 : (A : U0 Val) -> Nat1 -> A -> (A -> A) -> A = \A n z s. n A z s;
 
 add1 : Nat1 -> Nat1 -> Nat1 = \b a A z s. a A (b A z s) s;
 mul1 : Nat1 -> Nat1 -> Nat1 = \b a A z s. a A z (\x. b A x s);

@@ -23,17 +23,23 @@ object Parser:
       commentEnd = "-}",
       nestedComments = true,
       keywords = Set(
-        "Type",
-        "Type1",
-        "Val",
-        "Fun",
-        "Erased",
         "let",
-        "in",
-        "def"
+        "in"
       ),
-      operators =
-        Set("=", ":=", "::=", ":", "\\", ".", ",", "->", "**", "^", "`", "$"),
+      operators = Set(
+        "=",
+        ":=",
+        "::=",
+        ":",
+        "\\",
+        ".",
+        ",",
+        "->",
+        "**",
+        "^",
+        "`",
+        "$"
+      ),
       identStart = Predicate(_.isLetter),
       identLetter =
         Predicate(c => c.isLetterOrDigit || c == '_' || c == '\'' || c == '-'),
@@ -80,9 +86,6 @@ object Parser:
     private lazy val holeP: Parsley[Tm] =
       ("_" *> option(ident)).map(x => x.fold(hole)(x => Hole(Some(x))))
 
-    private lazy val rep: Parsley[Rep] =
-      "Val" #> RVal <|> "Fun" #> RFun <|> "Erased" #> RErased
-
     private lazy val atom: Parsley[Tm] = positioned(
       ("^" *> atom).map(t => Lift(t)) <|>
         ("`" *> atom).map(t => Quote(t)) <|>
@@ -91,9 +94,6 @@ object Parser:
         attempt("(" *> tm <~> "," *> tm <* ")").map(Pair.apply) <|>
         ("(" *> (userOp.map(Var.apply) <|> tm) <* ")") <|>
         holeP <|>
-        "Type1" #> Type(S1) <|>
-        attempt("Type" *> rep).map(r => Type(S0(r))) <|>
-        "Type" #> Type(S0(RVal)) <|>
         nat <|>
         ident.map(Var.apply)
     )
@@ -136,10 +136,13 @@ object Parser:
       positioned(
         ("let" *> identOrOp <~> option(
           ":" *> tm
-        ) <~> ("=" #> S1 <|> ":=" #> S0(RFun) <|> "::=" #> S0(RVal))
+        ) <~> ("=" #> Var(Name("U1")) <|> ":=" #> App(
+          Var(Name("U0")),
+          Var(Name("Fun"))
+        ) <|> "::=" #> App(Var(Name("U0")), Var(Name("Val"))))
           <~> tm <~> "in" *> tm)
-          .map { case ((((x, ty), st), v), b) =>
-            Let(x, st, ty, v, b)
+          .map { case ((((x, ty), univ), v), b) =>
+            Let(x, univ, ty, v, b)
           }
       )
 
@@ -200,9 +203,12 @@ object Parser:
     private lazy val defP: Parsley[Def] =
       (identOrOp <~> option(
         ":" *> tm
-      ) <~> ("=" #> S1 <|> ":=" #> S0(RFun) <|> "::=" #> S0(RVal))
-        <~> tm).map { case (((x, ot), st), v) =>
-        DDef(x, st, ot, v)
+      ) <~> ("=" #> Var(Name("U1")) <|> ":=" #> App(
+        Var(Name("U0")),
+        Var(Name("Fun"))
+      ) <|> "::=" #> App(Var(Name("U0")), Var(Name("Val"))))
+        <~> tm).map { case (((x, ot), univ), v) =>
+        DDef(x, univ, ot, v)
       }
 
   lazy val parser: Parsley[Defs] = LangLexer.fully(TmParser.defsP)
