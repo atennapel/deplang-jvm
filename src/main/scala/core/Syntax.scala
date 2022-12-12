@@ -15,9 +15,9 @@ object Syntax:
     case U0
     case U1
 
-    case Pi(name: Bind, ty: Ty, u1: Ty, body: Ty, u2: Ty)
-    case Lam(name: Bind, body: Tm)
-    case App(fn: Tm, arg: Tm)
+    case Pi(name: Bind, icit: Icit, ty: Ty, u1: Ty, body: Ty, u2: Ty)
+    case Lam(name: Bind, icit: Icit, body: Tm)
+    case App(fn: Tm, arg: Tm, icit: Icit)
 
     case PairTy(fst: Ty, snd: Ty)
     case Pair(fst: Tm, snd: Tm)
@@ -38,9 +38,9 @@ object Syntax:
     override def toString: String = this match
       case Local(x)  => s"'$x"
       case Global(x) => s"$x"
-      case Let(x, App(U0, VFVal), t, v, b) =>
+      case Let(x, App(U0, VFVal, Expl), t, v, b) =>
         s"(let $x : $t ::= $v in $b)"
-      case Let(x, App(U0, VFFun), t, v, b) =>
+      case Let(x, App(U0, VFFun, Expl), t, v, b) =>
         s"(let $x : $t := $v in $b)"
       case Let(x, U1, t, v, b) =>
         s"(let $x : $t = $v in $b)"
@@ -53,10 +53,13 @@ object Syntax:
       case U0    => s"U0"
       case U1    => s"U1"
 
-      case Pi(DontBind, t, u1, b, u2)  => s"($t ->{$u1}{$u2} $b)"
-      case Pi(DoBind(x), t, u1, b, u2) => s"(($x : $t) ->{$u1}{$u2} $b)"
-      case Lam(x, b)                   => s"(\\$x. $b)"
-      case App(f, a)                   => s"($f $a)"
+      case Pi(DontBind, Expl, t, u1, b, u2)  => s"($t ->{$u1}{$u2} $b)"
+      case Pi(DoBind(x), Expl, t, u1, b, u2) => s"(($x : $t) ->{$u1}{$u2} $b)"
+      case Pi(x, Impl, t, u1, b, u2)         => s"({$x : $t} ->{$u1}{$u2} $b)"
+      case Lam(x, Expl, b)                   => s"(\\$x. $b)"
+      case Lam(x, Impl, b)                   => s"(\\{$x}. $b)"
+      case App(f, a, Expl)                   => s"($f $a)"
+      case App(f, a, Impl)                   => s"($f {$a})"
 
       case PairTy(fst, snd) => s"($fst ** $snd)"
       case Pair(fst, snd)   => s"($fst, $snd)"
@@ -91,8 +94,8 @@ object Syntax:
     case DDef(name: Name, vf: Ty, ty: Ty, value: Tm)
 
     override def toString: String = this match
-      case DDef(x, App(U0, VFVal), t, v) => s"$x : $t ::= $v"
-      case DDef(x, App(U0, VFFun), t, v) => s"$x : $t := $v"
-      case DDef(x, U1, t, v)             => s"$x : $t = $v"
-      case DDef(x, _, t, v)              => s"$x : $t ?= $v"
+      case DDef(x, App(U0, VFVal, Expl), t, v) => s"$x : $t ::= $v"
+      case DDef(x, App(U0, VFFun, Expl), t, v) => s"$x : $t := $v"
+      case DDef(x, U1, t, v)                   => s"$x : $t = $v"
+      case DDef(x, _, t, v)                    => s"$x : $t ?= $v"
   export Def.*

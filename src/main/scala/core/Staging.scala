@@ -75,9 +75,9 @@ object Staging:
     case Nat          => VNat1
     case PairTy(a, b) => VPairTy1(eval1(a), eval1(b))
 
-    case Pi(x, a, _, b, u) => VFun1(eval1(a), eval1(u), eval1(b))
-    case Lam(x, b)         => VLam1(v => eval1Bind(b, v))
-    case App(f, a)         => vapp1(eval1(f), eval1(a))
+    case Pi(x, _, a, _, b, u) => VFun1(eval1(a), eval1(u), eval1(b))
+    case Lam(x, _, b)         => VLam1(v => eval1Bind(b, v))
+    case App(f, a, _)         => vapp1(eval1(f), eval1(a))
 
     case Lift(rep, t) => VType1
     case Quote(t)     => VQuote(eval0(t))
@@ -109,8 +109,8 @@ object Staging:
     case Let(x, u, t, v, b) =>
       VLet0(x, eval1(u), eval1(t), eval0(v), v => eval0Bind(b, v))
 
-    case Lam(x, b) => VLam0(x, v => eval0Bind(b, v))
-    case App(f, a) => VApp0(eval0(f), eval0(a))
+    case Lam(x, _, b) => VLam0(x, v => eval0Bind(b, v))
+    case App(f, a, _) => VApp0(eval0(f), eval0(a))
 
     case Pair(fst, snd) => VPair0(eval0(fst), eval0(snd))
     case Fst(t)         => VFst0(eval0(t))

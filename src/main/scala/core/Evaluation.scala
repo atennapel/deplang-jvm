@@ -11,10 +11,10 @@ object Evaluation:
       case CClos(env, tm) => eval(tm)(v :: env)
       case CFun(f)        => f(v)
 
-  def vapp(f: Val, a: Val): Val = f match
-    case VLam(_, b)        => b(a)
-    case VRigid(hd, sp)    => VRigid(hd, SApp(sp, a))
-    case VGlobal(x, sp, v) => VGlobal(x, SApp(sp, a), () => vapp(v(), a))
+  def vapp(f: Val, a: Val, i: Icit): Val = f match
+    case VLam(_, _, b)     => b(a)
+    case VRigid(hd, sp)    => VRigid(hd, SApp(sp, a, i))
+    case VGlobal(x, sp, v) => VGlobal(x, SApp(sp, a, i), () => vapp(v(), a, i))
     case _                 => impossible()
 
   def vquote(v: Val): Val = v match
@@ -31,7 +31,7 @@ object Evaluation:
   def vfoldnat(t: VTy, n: Val, z: Val, s: Val): Val = n match
     case VZ => z
     // foldNat {t} (S n) z s ~> s n (foldNat {t} n z s)
-    case VS(n)          => vapp(vapp(s, n), vfoldnat(t, n, z, s))
+    case VS(n)          => vapp(vapp(s, n, Expl), vfoldnat(t, n, z, s), Expl)
     case VRigid(hd, sp) => VRigid(hd, SFoldNat(sp, t, z, s))
     case VGlobal(x, sp, v) =>
       VGlobal(x, SFoldNat(sp, t, z, s), () => vfoldnat(t, v(), z, s))
@@ -65,9 +65,10 @@ object Evaluation:
     case U0    => VU0()
     case U1    => VU1
 
-    case Pi(x, t, u1, b, u2) => VPi(x, eval(t), eval(u1), Clos(b), eval(u2))
-    case Lam(x, b)           => VLam(x, Clos(b))
-    case App(f, a)           => vapp(eval(f), eval(a))
+    case Pi(x, i, t, u1, b, u2) =>
+      VPi(x, i, eval(t), eval(u1), Clos(b), eval(u2))
+    case Lam(x, i, b) => VLam(x, i, Clos(b))
+    case App(f, a, i) => vapp(eval(f), eval(a), i)
 
     case PairTy(fst, snd) => VPairTy(eval(fst), eval(snd))
     case Pair(fst, snd)   => VPair(eval(fst), eval(snd))
@@ -98,16 +99,18 @@ object Evaluation:
 
   private def quote(hd: Tm, sp: Spine, unfold: Unfold)(implicit k: Lvl): Tm =
     sp match
-      case SId         => hd
-      case SApp(sp, a) => App(quote(hd, sp, unfold), quote(a, unfold))
-      case SSplice(sp) => Splice(quote(hd, sp, unfold))
+      case SId            => hd
+      case SApp(sp, a, i) => App(quote(hd, sp, unfold), quote(a, unfold), i)
+      case SSplice(sp)    => Splice(quote(hd, sp, unfold))
       case SFoldNat(sp, t, z, s) =>
         App(
           App(
-            App(FoldNat(quote(t, unfold)), quote(hd, sp, unfold)),
-            quote(z, unfold)
+            App(FoldNat(quote(t, unfold)), quote(hd, sp, unfold), Expl),
+            quote(z, unfold),
+            Expl
           ),
-          quote(s, unfold)
+          quote(s, unfold),
+          Expl
         )
       case SFst(sp) => Fst(quote(hd, sp, unfold))
       case SSnd(sp) => Snd(quote(hd, sp, unfold))
@@ -130,15 +133,16 @@ object Evaluation:
       case VU0()  => U0
       case VU1    => U1
 
-      case VPi(x, t, u1, b, u2) =>
+      case VPi(x, i, t, u1, b, u2) =>
         Pi(
           x,
+          i,
           quote(t, unfold),
           quote(u1, unfold),
           quote(b, unfold),
           quote(u2, unfold)
         )
-      case VLam(x, b) => Lam(x, quote(b, unfold))
+      case VLam(x, i, b) => Lam(x, i, quote(b, unfold))
 
       case VPairTy(fst, snd) => PairTy(quote(fst, unfold), quote(snd, unfold))
       case VPair(fst, snd)   => Pair(quote(fst, unfold), quote(snd, unfold))

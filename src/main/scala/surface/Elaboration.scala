@@ -106,30 +106,31 @@ object Elaboration:
             .pretty(b)} : ${ctx.pretty(st2)}"
       )
       (force(a), force(b)) match
-        case (VPi(x1, a1, u11, b1, u12), VPi(x2, a2, u21, b2, u22)) =>
+        case (VPi(x1, i1, a1, u11, b1, u12), VPi(x2, i2, a2, u21, b2, u22)) =>
+          if i1 != i2 then throw ElaborateError(s"cannot coerce")
           val ctx2 = ctx.bind(x1, a2, u21)
           val coev0 = go(Local(ix0), a2, u21, a1, u11)(ctx2)
           coev0 match
             case None =>
               val body = go(
-                App(Wk(t), Local(ix0)),
+                App(Wk(t), Local(ix0), i1),
                 b1(VVar(ctx.lvl)),
                 u12,
                 b2(VVar(ctx.lvl)),
                 u22
               )(ctx2)
-              body.map(Lam(x1, _))
+              body.map(Lam(x1, i1, _))
             case Some(coev0) =>
               val body = go(
-                App(Wk(t), coev0),
+                App(Wk(t), coev0, i1),
                 b1(ctx2.eval(coev0)),
                 u12,
                 b2(VVar(ctx.lvl)),
                 u22
               )(ctx2)
               body match
-                case None       => Some(Lam(pick(x1, x2), App(Wk(t), coev0)))
-                case Some(body) => Some(Lam(pick(x1, x2), body))
+                case None => Some(Lam(pick(x1, x2), i1, App(Wk(t), coev0, i1)))
+                case Some(body) => Some(Lam(pick(x1, x2), i1, body))
         case (VU(vf), VU1) => Some(Lift(ctx.quote(vf), t))
         case (VLift(r1, a), VLift(r2, b)) =>
           if r1 != r2 then throw ElaborateError(s"Rep mismatch $r1 != $r2")
@@ -149,21 +150,24 @@ object Elaboration:
         throw ElaborateError(
           s"hole found _${x.getOrElse("")} : ${ctx.pretty(ty)}"
         )
-      case (S.Lam(x, b), VPi(_, t, u1, rt, u2)) =>
+      case (S.Lam(x, i1, b), VPi(_, i2, t, u1, rt, u2)) if i1 == i2 =>
         val eb = check(b, rt(VVar(ctx.lvl)), u2)(ctx.bind(x, t, u1))
-        Lam(x, eb)
+        Lam(x, i1, eb)
+      case (tm, VPi(x, Impl, t, u1, rt, u2)) =>
+        val etm = check(tm, rt(VVar(ctx.lvl)), u2)(ctx.bind(x, t, u1, true))
+        Lam(x, Impl, etm)
 
-      case (S.Pi(x, t, b), VU1) =>
+      case (S.Pi(x, i, t, b), VU1) =>
         val et = checkType(t, VU1)
         val eb = checkType(b, VU1)(ctx.bind(x, ctx.eval(et), VU1))
-        Pi(x, et, U1, eb, U1)
-      case (S.Pi(x, t, b), VUFun()) =>
+        Pi(x, i, et, U1, eb, U1)
+      case (S.Pi(x, i, t, b), VUFun()) =>
         val et = checkType(t, VUVal())
         val (eb, u2, _) = inferType(b)(ctx.bind(x, ctx.eval(et), VUVal()))
         force(u2) match
           case VU1 => throw ElaborateError(s"invalid universes: $tm")
           case _   =>
-        Pi(x, et, ctx.quote(VUVal()), eb, ctx.quote(u2))
+        Pi(x, i, et, ctx.quote(VUVal()), eb, ctx.quote(u2))
 
       // case (S.Lift(ty), VType(S1)) =>
       //  Lift(checkType(ty, S0(RVal)))
@@ -205,24 +209,24 @@ object Elaboration:
       case S.Var(Name("Fun")) => (VFFun, VVF, VU1)
       case S.Var(Name("U1"))  => (U1, VU1, VU1)
       case S.Var(Name("U0"))  => (U0, vpi("_", VVF, VU1, VU1, _ => VU1), VU1)
-      case S.App(S.Var(Name("fst")), t) =>
+      case S.App(S.Var(Name("fst")), t, Expl) =>
         val (et, vt, st) = infer(t)
         force(vt) match
           case VPairTy(fst, snd) => (Fst(et), fst, VUVal())
           case _ => throw ElaborateError(s"expected pair type in $tm")
-      case S.App(S.Var(Name("snd")), t) =>
+      case S.App(S.Var(Name("snd")), t, Expl) =>
         val (et, vt, st) = infer(t)
         force(vt) match
           case VPairTy(fst, snd) => (Snd(et), snd, VUVal())
           case _ => throw ElaborateError(s"expected pair type in $tm")
       case S.Var(Name("Nat")) => (Nat, VUVal(), VU1)
       case S.Var(Name("Z"))   => (Z, VNat, VUVal())
-      case S.App(S.Var(Name("S")), n) =>
+      case S.App(S.Var(Name("S")), n, Expl) =>
         val en = check(n, VNat, VUVal())
         (NatS(en), VNat, VUVal())
       case S.Var(Name("S")) =>
         (
-          Lam(DoBind(Name("x")), NatS(Local(ix0))),
+          Lam(DoBind(Name("x")), Expl, NatS(Local(ix0))),
           vpi("_", VNat, VUVal(), VUVal(), _ => VNat),
           VUFun()
         )
@@ -233,7 +237,11 @@ object Elaboration:
       --------------------------------------
       foldNat n z s ~> foldNat {A} n z s : A
        */
-      case S.App(S.App(S.App(S.Var(Name("foldNat")), n), z), s) =>
+      case S.App(
+            S.App(S.App(S.Var(Name("foldNat")), n, Expl), z, Expl),
+            s,
+            Expl
+          ) =>
         val en = check(n, VNat, VUVal())
         val (ez, vt) = infer(z, VUVal())
         val es = check(
@@ -247,7 +255,11 @@ object Elaboration:
           ),
           VUFun()
         )
-        (App(App(App(FoldNat(ctx.quote(vt)), en), ez), es), vt, VUVal())
+        (
+          App(App(App(FoldNat(ctx.quote(vt)), en, Expl), ez, Expl), es, Expl),
+          vt,
+          VUVal()
+        )
       case S.Var(Name("foldNat")) =>
         throw ElaborateError(s"foldNat must be fully applied")
       case S.Var(x) =>
@@ -263,7 +275,7 @@ object Elaboration:
         val (ev, et, vt) = inferValue(v, t, ctx.eval(eu))
         val (eb, rty, st2) = infer(b)(ctx.define(x, vt, veu, ctx.eval(ev)))
         (Let(x, eu, et, ev, eb), rty, st2)
-      case S.Pi(x, t, b) =>
+      case S.Pi(x, i, t, b) =>
         val (et, u1, _) = inferType(t)
         val (eb, u2) = force(u1) match
           case VU1 =>
@@ -278,13 +290,13 @@ object Elaboration:
           case (VUVal(), VUFun()) => VUFun()
           case (VUVal(), VUVal()) => VUFun()
           case _ => throw ElaborateError(s"incompatible universes in pi: $tm")
-        (Pi(x, et, ctx.quote(u1), eb, ctx.quote(u2)), u3, VU1)
-      case S.App(f, a) =>
+        (Pi(x, i, et, ctx.quote(u1), eb, ctx.quote(u2)), u3, VU1)
+      case S.App(f, a, i) =>
         val (ef, fty, st) = infer(f)
         force(fty) match
-          case VPi(_, t, u1, b, u2) =>
+          case VPi(_, i2, t, u1, b, u2) if i == i2 =>
             val ea = check(a, t, u1)
-            (App(ef, ea), b(ctx.eval(ea)), u2)
+            (App(ef, ea, i), b(ctx.eval(ea)), u2)
           case _ =>
             throw ElaborateError(
               s"pi expected in $tm but got: ${ctx.pretty(fty)}"

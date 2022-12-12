@@ -57,3 +57,8 @@ object Common:
       case DoBind(x) => DoBind(x.fresh)
       case DontBind  => DontBind
   export Bind.*
+
+  enum Icit:
+    case Expl
+    case Impl
+  export Icit.*

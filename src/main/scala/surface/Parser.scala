@@ -104,33 +104,38 @@ object Parser:
     private val nS = Var(Name("S"))
     private lazy val nat: Parsley[Tm] = natural.map(n =>
       var c: Tm = nZ
-      for (_ <- 0.until(n)) c = App(nS, c)
+      for (_ <- 0.until(n)) c = App(nS, c, Expl)
       c
     )
 
     lazy val tm: Parsley[Tm] = positioned(
       attempt(pi) <|> let <|> lam <|>
         precedence[Tm](app)(
-          Ops(InfixR)("->" #> ((l, r) => Pi(DontBind, l, r)))
+          Ops(InfixR)("->" #> ((l, r) => Pi(DontBind, Expl, l, r)))
         )
     )
 
     private lazy val pi: Parsley[Tm] =
       positioned(
         ((some(piParam) <|> app.map(t =>
-          List((List(DontBind), Some(t)))
+          List((List(DontBind), Expl, Some(t)))
         )) <~> "->" *> tm)
           .map { case (ps, rt) =>
-            ps.foldRight(rt) { case ((xs, ty), rt) =>
-              xs.foldRight(rt)((x, rt) => Pi(x, ty.getOrElse(hole), rt))
+            ps.foldRight(rt) { case ((xs, i, ty), rt) =>
+              xs.foldRight(rt)((x, rt) => Pi(x, i, ty.getOrElse(hole), rt))
             }
           }
       )
 
-    private type PiParam = (List[Bind], Option[Ty])
+    private type PiParam = (List[Bind], Icit, Option[Ty])
 
     private lazy val piParam: Parsley[PiParam] =
-      ("(" *> some(bind) <~> ":" *> tm <* ")").map((xs, ty) => (xs, Some(ty)))
+      ("{" *> some(bind) <~> ":" *> tm <* "}").map((xs, ty) =>
+        (xs, Impl, Some(ty))
+      ) <|>
+        ("(" *> some(bind) <~> ":" *> tm <* ")").map((xs, ty) =>
+          (xs, Expl, Some(ty))
+        )
 
     private lazy val let: Parsley[Tm] =
       positioned(
@@ -138,8 +143,9 @@ object Parser:
           ":" *> tm
         ) <~> ("=" #> Var(Name("U1")) <|> ":=" #> App(
           Var(Name("U0")),
-          Var(Name("Fun"))
-        ) <|> "::=" #> App(Var(Name("U0")), Var(Name("Val"))))
+          Var(Name("Fun")),
+          Expl
+        ) <|> "::=" #> App(Var(Name("U0")), Var(Name("Val")), Expl))
           <~> tm <~> "in" *> tm)
           .map { case ((((x, ty), univ), v), b) =>
             Let(x, univ, ty, v, b)
@@ -148,10 +154,14 @@ object Parser:
 
     private lazy val lam: Parsley[Tm] =
       positioned(
-        ("\\" *> many(bind) <~> "." *> tm).map((xs, b) =>
-          xs.foldRight(b)(Lam.apply)
+        ("\\" *> many(lamParam) <~> "." *> tm).map((xs, b) =>
+          xs.foldRight(b) { case ((x, i), b) => Lam(x, i, b) }
         )
       )
+
+    private lazy val lamParam: Parsley[(Bind, Icit)] =
+      ("{" *> bind <* "}").map(x => (x, Impl)) <|>
+        bind.map(x => (x, Expl))
 
     private lazy val app: Parsley[Tm] =
       precedence[Tm](appAtom)(
@@ -171,22 +181,31 @@ object Parser:
       )
 
     private lazy val appAtom: Parsley[Tm] = positioned(
-      (atom <~> many(atom) <~> option(let <|> lam))
+      (atom <~> many(arg) <~> option(let <|> lam))
         .map { case ((fn, args), opt) =>
-          (args ++ opt).foldLeft(fn) { case (fn, arg) => App(fn, arg) }
+          (args ++ opt.map(t => (t, Expl))).foldLeft(fn) {
+            case (fn, (arg, i)) =>
+              App(fn, arg, i)
+          }
         }
     )
+
+    private lazy val arg: Parsley[(Tm, Icit)] =
+      ("{" *> tm <* "}").map(t => (t, Impl)) <|>
+        atom.map(t => (t, Expl))
 
     private def userOpStart(s: String): Parsley[String] =
       userOp0.filter(_.startsWith(s))
     private def opL(o: String): Parsley[InfixL.Op[Tm]] =
       attempt(userOpStart(o).filterNot(_.endsWith(":"))).map(op =>
-        (l, r) => App(App(Var(Name(op)), l), r)
+        (l, r) => App(App(Var(Name(op)), l, Expl), r, Expl)
       )
     private def opR(o: String): Parsley[InfixR.Op[Tm]] =
-      attempt(userOpStart(o)).map(op => (l, r) => App(App(Var(Name(op)), l), r))
+      attempt(userOpStart(o)).map(op =>
+        (l, r) => App(App(Var(Name(op)), l, Expl), r, Expl)
+      )
     private def opP(o: String): Parsley[Prefix.Op[Tm]] =
-      attempt(userOpStart(o)).map(op => t => App(Var(Name(op)), t))
+      attempt(userOpStart(o)).map(op => t => App(Var(Name(op)), t, Expl))
     private def opLevel(s: String): List[Ops[Tm, Tm]] =
       val chars = s.toList
       List(
@@ -205,8 +224,9 @@ object Parser:
         ":" *> tm
       ) <~> ("=" #> Var(Name("U1")) <|> ":=" #> App(
         Var(Name("U0")),
-        Var(Name("Fun"))
-      ) <|> "::=" #> App(Var(Name("U0")), Var(Name("Val"))))
+        Var(Name("Fun")),
+        Expl
+      ) <|> "::=" #> App(Var(Name("U0")), Var(Name("Val")), Expl))
         <~> tm).map { case (((x, ot), univ), v) =>
         DDef(x, univ, ot, v)
       }

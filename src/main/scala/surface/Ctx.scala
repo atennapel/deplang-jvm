@@ -18,16 +18,17 @@ final case class Ctx(
 ):
   def enter(pos: PosInfo): Ctx = copy(pos = pos)
 
-  def bind(x: Bind, ty: VTy, univ: VTy): Ctx = x match
-    case DontBind =>
-      copy(lvl = lvl + 1, env = VVar(lvl) :: env, names = x.toName :: names)
-    case DoBind(y) =>
-      copy(
-        lvl = lvl + 1,
-        env = VVar(lvl) :: env,
-        types = (y, lvl, ty, univ) :: types,
-        names = x.toName :: names
-      )
+  def bind(x: Bind, ty: VTy, univ: VTy, inserted: Boolean = false): Ctx =
+    x match
+      case DoBind(y) if !inserted =>
+        copy(
+          lvl = lvl + 1,
+          env = VVar(lvl) :: env,
+          types = (y, lvl, ty, univ) :: types,
+          names = x.toName :: names
+        )
+      case _ =>
+        copy(lvl = lvl + 1, env = VVar(lvl) :: env, names = x.toName :: names)
 
   def define(x: Name, ty: VTy, univ: VTy, value: Val): Ctx =
     copy(

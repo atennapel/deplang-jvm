@@ -8,9 +8,9 @@ object Syntax:
     case Var(name: Name)
     case Let(name: Name, univ: Ty, ty: Option[Ty], value: Tm, body: Tm)
 
-    case Pi(name: Bind, ty: Ty, body: Ty)
-    case Lam(name: Bind, body: Tm)
-    case App(fn: Tm, arg: Tm)
+    case Pi(name: Bind, icit: Icit, ty: Ty, body: Ty)
+    case Lam(name: Bind, icit: Icit, body: Tm)
+    case App(fn: Tm, arg: Tm, icit: Icit)
 
     case PairTy(fst: Ty, snd: Ty)
     case Pair(fst: Tm, snd: Tm)
@@ -27,23 +27,26 @@ object Syntax:
       case Var(x) => s"$x"
       case Let(x, u, Some(t), v, b) =>
         val s = u.removePos match
-          case App(Var(Name("U0")), Var(Name("Val"))) => s"::"
-          case App(Var(Name("U0")), Var(Name("Fun"))) => s":"
+          case App(Var(Name("U0")), Var(Name("Val")), Expl) => s"::"
+          case App(Var(Name("U0")), Var(Name("Fun")), Expl) => s":"
           case Var(Name("U1"))                        => s""
           case _                                      => s"?"
         s"(let $x : $t $s= $v in $b)"
       case Let(x, u, None, v, b) =>
         val s = u.removePos match
-          case App(Var(Name("U0")), Var(Name("Val"))) => s"::"
-          case App(Var(Name("U0")), Var(Name("Fun"))) => s":"
+          case App(Var(Name("U0")), Var(Name("Val")), Expl) => s"::"
+          case App(Var(Name("U0")), Var(Name("Fun")), Expl) => s":"
           case Var(Name("U1"))                        => s""
           case _                                      => s"?"
         s"(let $x $s= $v in $b)"
 
-      case Pi(DontBind, t, b)  => s"($t -> $b)"
-      case Pi(DoBind(x), t, b) => s"(($x : $t) -> $b)"
-      case Lam(x, b)           => s"(\\$x. $b)"
-      case App(f, a)           => s"($f $a)"
+      case Pi(DontBind, Expl, t, b)  => s"($t -> $b)"
+      case Pi(DoBind(x), Expl, t, b) => s"(($x : $t) -> $b)"
+      case Pi(x, Impl, t, b)         => s"({$x : $t} -> $b)"
+      case Lam(x, Expl, b)           => s"(\\$x. $b)"
+      case Lam(x, Impl, b)           => s"(\\{$x}. $b)"
+      case App(f, a, Expl)           => s"($f $a)"
+      case App(f, a, Impl)           => s"($f {$a})"
 
       case Lift(t)   => s"^$t"
       case Quote(t)  => s"`$t"
@@ -65,9 +68,9 @@ object Syntax:
       case Let(x, s, t, v, b) =>
         Let(x, s, t.map(_.removePos), v.removePos, b.removePos)
 
-      case Pi(x, t, b) => Pi(x, t.removePos, b.removePos)
-      case Lam(x, b)   => Lam(x, b.removePos)
-      case App(f, a)   => App(f.removePos, a.removePos)
+      case Pi(x, i, t, b) => Pi(x, i, t.removePos, b.removePos)
+      case Lam(x, i, b)   => Lam(x, i, b.removePos)
+      case App(f, a, i)   => App(f.removePos, a.removePos, i)
 
       case Lift(t)   => Lift(t.removePos)
       case Quote(t)  => Quote(t.removePos)
@@ -92,15 +95,15 @@ object Syntax:
     override def toString: String = this match
       case DDef(x, u, Some(t), v) =>
         val s = u.removePos match
-          case App(Var(Name("U0")), Var(Name("Val"))) => s"::"
-          case App(Var(Name("U0")), Var(Name("Fun"))) => s":"
+          case App(Var(Name("U0")), Var(Name("Val")), Expl) => s"::"
+          case App(Var(Name("U0")), Var(Name("Fun")), Expl) => s":"
           case Var(Name("U1"))                        => s""
           case _                                      => s"?"
         s"$x : $t $summon= $v;"
       case DDef(x, u, None, v) =>
         val s = u.removePos match
-          case App(Var(Name("U0")), Var(Name("Val"))) => s"::"
-          case App(Var(Name("U0")), Var(Name("Fun"))) => s":"
+          case App(Var(Name("U0")), Var(Name("Val")), Expl) => s"::"
+          case App(Var(Name("U0")), Var(Name("Fun")), Expl) => s":"
           case Var(Name("U1"))                        => s""
           case _                                      => s"?"
         s"$x $s= $v;"

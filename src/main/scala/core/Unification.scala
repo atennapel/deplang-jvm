@@ -9,9 +9,9 @@ object Unification:
   final case class UnifyError(msg: String) extends Exception(msg)
 
   private def unify(a: Spine, b: Spine)(implicit k: Lvl): Unit = (a, b) match
-    case (SId, SId)                     => ()
-    case (SApp(sp1, a1), SApp(sp2, a2)) => unify(sp1, sp2); unify(a1, a2)
-    case (SSplice(sp1), SSplice(sp2))   => unify(sp1, sp2)
+    case (SId, SId)                           => ()
+    case (SApp(sp1, a1, _), SApp(sp2, a2, _)) => unify(sp1, sp2); unify(a1, a2)
+    case (SSplice(sp1), SSplice(sp2))         => unify(sp1, sp2)
     case (SFoldNat(sp1, t1, z1, s1), SFoldNat(sp2, t2, z2, s2)) =>
       unify(sp1, sp2); unify(t1, t2); unify(z1, z2); unify(s1, s2)
     case (SFst(sp1), SFst(sp2)) => unify(sp1, sp2)
@@ -33,15 +33,17 @@ object Unification:
       case (VS(n), VS(m))             => unify(n, m)
       case (VLift(_, a), VLift(_, b)) => unify(a, b)
       case (VQuote(a), VQuote(b))     => unify(a, b)
-      case (VPi(_, t1, u11, b1, u12), VPi(_, t2, u21, b2, u22)) =>
+      case (VPi(_, _, t1, u11, b1, u12), VPi(_, _, t2, u21, b2, u22)) =>
         unify(t1, t2); unify(u11, u21); unify(b1, b2); unify(u12, u22)
       case (VPair(a1, b1), VPair(a2, b2))     => unify(a1, a2); unify(b1, b2)
       case (VPairTy(a1, b1), VPairTy(a2, b2)) => unify(a1, a2); unify(b1, b2)
       case (VRigid(h1, sp1), VRigid(h2, sp2)) if h1 == h2 => unify(sp1, sp2)
 
-      case (VLam(_, b1), VLam(_, b2)) => unify(b1, b2)
-      case (VLam(_, b), f) => val v = VVar(k); unify(b(v), vapp(f, v))(k + 1)
-      case (f, VLam(_, b)) => val v = VVar(k); unify(vapp(f, v), b(v))(k + 1)
+      case (VLam(_, i1, b1), VLam(_, i2, b2)) if i1 == i2 => unify(b1, b2)
+      case (VLam(_, i, b), f) =>
+        val v = VVar(k); unify(b(v), vapp(f, v, i))(k + 1)
+      case (f, VLam(_, i, b)) =>
+        val v = VVar(k); unify(vapp(f, v, i), b(v))(k + 1)
 
       case (VGlobal(x1, sp1, v1), VGlobal(x2, sp2, v2)) if x1 == x2 =>
         try unify(sp1, sp2)
