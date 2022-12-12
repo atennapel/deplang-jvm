@@ -62,3 +62,14 @@ object Common:
     case Expl
     case Impl
   export Icit.*
+
+  opaque type MetaId = Int
+
+  inline def metaId(id: Int): MetaId = id
+
+  extension (id: MetaId)
+    @targetName("exposeMetaId")
+    inline def expose: Int = id
+
+  type BD = Boolean // false = bound, true = defined
+  type BDs = List[BD]

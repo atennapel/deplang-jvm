@@ -8,6 +8,8 @@ import Evaluation.*
 object Unification:
   final case class UnifyError(msg: String) extends Exception(msg)
 
+  private def solve(id: MetaId, sp: Spine, v: Val)(implicit k: Lvl): Unit = ???
+
   private def unify(a: Spine, b: Spine)(implicit k: Lvl): Unit = (a, b) match
     case (SId, SId)                           => ()
     case (SApp(sp1, a1, _), SApp(sp2, a2, _)) => unify(sp1, sp2); unify(a1, a2)
@@ -23,7 +25,7 @@ object Unification:
 
   def unify(a: Val, b: Val)(implicit k: Lvl): Unit =
     debug(s"unify ${quote(a)} ~ ${quote(b)}")
-    (force(a, UnfoldNone), force(b, UnfoldNone)) match
+    (force(a, UnfoldMetas), force(b, UnfoldMetas)) match
       case (VVF, VVF)                 => ()
       case (VVFVal, VVFVal)           => ()
       case (VVFFun, VVFFun)           => ()
@@ -44,6 +46,10 @@ object Unification:
         val v = VVar(k); unify(b(v), vapp(f, v, i))(k + 1)
       case (f, VLam(_, i, b)) =>
         val v = VVar(k); unify(vapp(f, v, i), b(v))(k + 1)
+
+      case (VFlex(id1, sp1), VFlex(id2, sp2)) if id1 == id2 => unify(sp1, sp2)
+      case (VFlex(id, sp), v)                               => solve(id, sp, v)
+      case (v, VFlex(id, sp))                               => solve(id, sp, v)
 
       case (VGlobal(x1, sp1, v1), VGlobal(x2, sp2, v2)) if x1 == x2 =>
         try unify(sp1, sp2)

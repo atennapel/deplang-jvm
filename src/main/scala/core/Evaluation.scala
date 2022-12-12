@@ -4,6 +4,7 @@ import common.Common.*
 import Globals.getGlobal
 import Syntax.*
 import Value.*
+import Metas.*
 
 object Evaluation:
   extension (c: Clos)
@@ -14,17 +15,20 @@ object Evaluation:
   def vapp(f: Val, a: Val, i: Icit): Val = f match
     case VLam(_, _, b)     => b(a)
     case VRigid(hd, sp)    => VRigid(hd, SApp(sp, a, i))
+    case VFlex(id, sp)     => VFlex(id, SApp(sp, a, i))
     case VGlobal(x, sp, v) => VGlobal(x, SApp(sp, a, i), () => vapp(v(), a, i))
     case _                 => impossible()
 
   def vquote(v: Val): Val = v match
     case VRigid(hd, SSplice(sp))     => VRigid(hd, sp)
+    case VFlex(hd, SSplice(sp))      => VFlex(hd, sp)
     case VGlobal(hd, SSplice(sp), v) => VGlobal(hd, sp, () => vquote(v()))
     case v                           => VQuote(v)
 
   def vsplice(v: Val): Val = v match
     case VQuote(v)         => v
     case VRigid(hd, sp)    => VRigid(hd, SSplice(sp))
+    case VFlex(hd, sp)     => VFlex(hd, SSplice(sp))
     case VGlobal(x, sp, v) => VGlobal(x, SSplice(sp), () => vsplice(v()))
     case _                 => impossible()
 
@@ -33,6 +37,7 @@ object Evaluation:
     // foldNat {t} (S n) z s ~> s n (foldNat {t} n z s)
     case VS(n)          => vapp(vapp(s, n, Expl), vfoldnat(t, n, z, s), Expl)
     case VRigid(hd, sp) => VRigid(hd, SFoldNat(sp, t, z, s))
+    case VFlex(hd, sp)  => VFlex(hd, SFoldNat(sp, t, z, s))
     case VGlobal(x, sp, v) =>
       VGlobal(x, SFoldNat(sp, t, z, s), () => vfoldnat(t, v(), z, s))
     case _ => impossible()
@@ -40,14 +45,26 @@ object Evaluation:
   def vfst(v: Val): Val = v match
     case VPair(fst, snd)   => fst
     case VRigid(hd, sp)    => VRigid(hd, SFst(sp))
+    case VFlex(hd, sp)     => VFlex(hd, SFst(sp))
     case VGlobal(x, sp, v) => VGlobal(x, SFst(sp), () => vfst(v()))
     case _                 => impossible()
 
   def vsnd(v: Val): Val = v match
     case VPair(fst, snd)   => snd
     case VRigid(hd, sp)    => VRigid(hd, SSnd(sp))
+    case VFlex(hd, sp)     => VFlex(hd, SSnd(sp))
     case VGlobal(x, sp, v) => VGlobal(x, SSnd(sp), () => vsnd(v()))
     case _                 => impossible()
+
+  def vmeta(id: MetaId): Val = getMeta(id) match
+    case Unsolved     => VMeta(id)
+    case Solved(v, _) => v
+
+  def vappbds(v: Val, bds: BDs)(implicit env: Env): Val = (env, bds) match
+    case (Nil, Nil)               => v
+    case (t :: env, false :: bds) => vapp(vappbds(v, bds)(env), t, Expl)
+    case (t :: env, true :: bds)  => vappbds(v, bds)
+    case _                        => impossible()
 
   def eval(tm: Tm)(implicit env: Env): Val = tm match
     case Local(ix) => env(ix.expose)
@@ -87,8 +104,11 @@ object Evaluation:
     case FoldNat(t) =>
       vlam("n", n => vlam("z", z => vlam("s", s => vfoldnat(eval(t), n, z, s))))
 
+    case Meta(id)              => vmeta(id)
+    case InsertedMeta(id, bds) => vappbds(vmeta(id), bds)
+
   enum Unfold:
-    case UnfoldNone
+    case UnfoldMetas
     case UnfoldAll
   export Unfold.*
 
@@ -122,9 +142,10 @@ object Evaluation:
     case HVar(l) => Local(l.toIx)
     case HU0     => U0
 
-  def quote(v: Val, unfold: Unfold = UnfoldNone)(implicit k: Lvl): Tm =
+  def quote(v: Val, unfold: Unfold = UnfoldMetas)(implicit k: Lvl): Tm =
     force(v, unfold) match
       case VRigid(hd, sp)    => quote(quote(hd), sp, unfold)
+      case VFlex(hd, sp)     => quote(Meta(hd), sp, unfold)
       case VGlobal(x, sp, v) => quote(Global(x), sp, unfold)
 
       case VVF    => VF

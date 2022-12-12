@@ -66,6 +66,8 @@ object Pretty:
     case Pair(_, _)          => pretty(tm)
     case Fst(_)              => pretty(tm)
     case Snd(_)              => pretty(tm)
+    case Meta(_)             => pretty(tm)
+    case InsertedMeta(_, _)  => pretty(tm)
     case Wk(t)               => prettyParen(t, app)(ns.tail)
     case _                   => s"(${pretty(tm)})"
 
@@ -106,6 +108,9 @@ object Pretty:
     case Z          => prettyNat(tm)
     case S(_)       => prettyNat(tm)
     case FoldNat(t) => s"foldNat {${pretty(t)}}"
+
+    case Meta(id)            => s"?$id"
+    case InsertedMeta(id, _) => s"?$id"
 
   def pretty(d: Def)(implicit ns: List[Name]): String = d match
     case DDef(x0, u, t, v) =>

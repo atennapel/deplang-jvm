@@ -30,6 +30,7 @@ object Value:
   type VTy = Val
   enum Val:
     case VRigid(head: Head, spine: Spine)
+    case VFlex(id: MetaId, spine: Spine)
     case VGlobal(name: Name, spine: Spine, value: () => Val)
 
     case VVF
@@ -62,6 +63,12 @@ object Value:
     def unapply(value: Val): Option[Lvl] = value match
       case VRigid(HVar(hd), SId) => Some(hd)
       case _                     => None
+
+  object VMeta:
+    def apply(id: MetaId) = VFlex(id, SId)
+    def unapply(value: Val): Option[MetaId] = value match
+      case VFlex(id, SId) => Some(id)
+      case _              => None
 
   object VU0:
     def apply() = VRigid(HU0, SId)

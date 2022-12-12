@@ -35,6 +35,9 @@ object Syntax:
     case S(n: Tm)
     case FoldNat(ty: Ty)
 
+    case Meta(id: MetaId)
+    case InsertedMeta(id: MetaId, bds: BDs)
+
     override def toString: String = this match
       case Local(x)  => s"'$x"
       case Global(x) => s"$x"
@@ -76,6 +79,9 @@ object Syntax:
       case Z          => "Z"
       case S(n)       => s"(S $n)"
       case FoldNat(t) => s"(foldNat {$t})"
+
+      case Meta(id)            => s"?$id"
+      case InsertedMeta(id, _) => s"?$id"
   export Tm.*
 
   def tQuote(t: Tm): Tm = t match
