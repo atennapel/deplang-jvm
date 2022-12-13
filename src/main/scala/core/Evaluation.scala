@@ -95,6 +95,8 @@ object Evaluation:
     case Lam(x, i, b) => VLam(x, i, Clos(b))
     case App(f, a, i) => vapp(eval(f), eval(a), i)
 
+    case Sigma(x, t, u1, b, u2) =>
+      VSigma(x, eval(t), eval(u1), Clos(b), eval(u2))
     case PairTy(fst, snd) => VPairTy(eval(fst), eval(snd))
     case Pair(fst, snd)   => VPair(eval(fst), eval(snd))
     case Fst(t)           => vfst(eval(t))
@@ -177,6 +179,14 @@ object Evaluation:
         )
       case VLam(x, i, b) => Lam(x, i, quote(b, unfold))
 
+      case VSigma(x, t, u1, b, u2) =>
+        Sigma(
+          x,
+          quote(t, unfold),
+          quote(u1, unfold),
+          quote(b, unfold),
+          quote(u2, unfold)
+        )
       case VPairTy(fst, snd) => PairTy(quote(fst, unfold), quote(snd, unfold))
       case VPair(fst, snd)   => Pair(quote(fst, unfold), quote(snd, unfold))
 

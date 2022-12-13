@@ -20,6 +20,11 @@ TODO:
 - [x] IR syntax
 - [x] Metas, zonking and unification
 - [x] Meta insertion
+- [ ] Sigmas
+  - [x] Syntax
+  - [ ] Parsing
+  - [ ] Elaboration
+  - [ ] Remove PairTy
+  - [ ] Named projection
 - [ ] IR Lambda removal: eta expansion, closure conversion, lambda lifting
 - [ ] Bytecode generation
-- [ ] Sigmas

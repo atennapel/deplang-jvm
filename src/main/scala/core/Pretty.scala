@@ -15,6 +15,14 @@ object Pretty:
       s"{$x : ${pretty(t)}} -> ${prettyPi(b)(x.toName :: ns)}"
     case rest => pretty(rest)
 
+  private def prettySigma(tm: Tm)(implicit ns: List[Name]): String = tm match
+    case Sigma(DontBind, t, _, b, _) =>
+      s"${prettyParen(t, true)} ** ${prettySigma(b)(DontBind.toName :: ns)}"
+    case Sigma(DoBind(x0), t, _, b, _) =>
+      val x = x0.fresh
+      s"($x : ${pretty(t)}) ** ${prettySigma(b)(x :: ns)}"
+    case rest => pretty(rest)
+
   private def prettyLam(tm: Tm)(implicit ns: List[Name]): String =
     def go(tm: Tm, ns: List[Name], first: Boolean = false): String = tm match
       case Lam(x0, Expl, b) =>
@@ -93,10 +101,11 @@ object Pretty:
     case Lam(_, _, _)         => prettyLam(tm)
     case App(_, _, _)         => prettyApp(tm)
 
-    case PairTy(fst, snd) => s"($fst ** $snd)"
-    case Pair(fst, snd)   => s"($fst, $snd)"
-    case Fst(t)           => s"(fst $t)"
-    case Snd(t)           => s"(snd $t)"
+    case Sigma(_, _, _, _, _) => prettySigma(tm)
+    case PairTy(fst, snd)     => s"($fst ** $snd)"
+    case Pair(fst, snd)       => s"($fst, $snd)"
+    case Fst(t)               => s"(fst $t)"
+    case Snd(t)               => s"(snd $t)"
 
     case Lift(_, t) => s"^${prettyParen(t)}"
     case Quote(t)   => s"`${prettyParen(t)}"

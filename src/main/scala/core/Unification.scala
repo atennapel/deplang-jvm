@@ -75,6 +75,14 @@ object Unification:
         )
       case VLam(x, i, b) => Lam(x, i, goCl(b))
 
+      case VSigma(x, t, u1, b, u2) =>
+        Sigma(
+          x,
+          go(t),
+          go(u1),
+          goCl(b),
+          go(u2)
+        )
       case VPairTy(fst, snd) => PairTy(go(fst), go(snd))
       case VPair(fst, snd)   => Pair(go(fst), go(snd))
 
@@ -131,6 +139,8 @@ object Unification:
       case (VLift(_, a), VLift(_, b)) => unify(a, b)
       case (VQuote(a), VQuote(b))     => unify(a, b)
       case (VPi(_, _, t1, u11, b1, u12), VPi(_, _, t2, u21, b2, u22)) =>
+        unify(t1, t2); unify(u11, u21); unify(b1, b2); unify(u12, u22)
+      case (VSigma(_, t1, u11, b1, u12), VSigma(_, t2, u21, b2, u22)) =>
         unify(t1, t2); unify(u11, u21); unify(b1, b2); unify(u12, u22)
       case (VPair(a1, b1), VPair(a2, b2))     => unify(a1, a2); unify(b1, b2)
       case (VPairTy(a1, b1), VPairTy(a2, b2)) => unify(a1, a2); unify(b1, b2)

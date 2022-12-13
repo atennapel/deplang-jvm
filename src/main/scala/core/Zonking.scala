@@ -68,6 +68,8 @@ object Zonking:
       Pi(x, i, zonk(t), zonk(u1), zonkLift(b), zonk(u2))
     case Lam(x, i, b) => Lam(x, i, zonkLift(b))
 
+    case Sigma(x, t, u1, b, u2) =>
+      Sigma(x, zonk(t), zonk(u1), zonkLift(b), zonk(u2))
     case PairTy(fst, snd) => PairTy(zonk(fst), zonk(snd))
     case Pair(fst, snd)   => Pair(zonk(fst), zonk(snd))
 

@@ -12,6 +12,7 @@ object Syntax:
     case Lam(name: Bind, icit: Icit, body: Tm)
     case App(fn: Tm, arg: Tm, icit: Icit)
 
+    case Sigma(name: Bind, ty: Ty, body: Ty)
     case PairTy(fst: Ty, snd: Ty)
     case Pair(fst: Tm, snd: Tm)
 
@@ -29,15 +30,15 @@ object Syntax:
         val s = u.removePos match
           case App(Var(Name("U0")), Var(Name("Val")), Expl) => s"::"
           case App(Var(Name("U0")), Var(Name("Fun")), Expl) => s":"
-          case Var(Name("U1"))                        => s""
-          case _                                      => s"?"
+          case Var(Name("U1"))                              => s""
+          case _                                            => s"?"
         s"(let $x : $t $s= $v in $b)"
       case Let(x, u, None, v, b) =>
         val s = u.removePos match
           case App(Var(Name("U0")), Var(Name("Val")), Expl) => s"::"
           case App(Var(Name("U0")), Var(Name("Fun")), Expl) => s":"
-          case Var(Name("U1"))                        => s""
-          case _                                      => s"?"
+          case Var(Name("U1"))                              => s""
+          case _                                            => s"?"
         s"(let $x $s= $v in $b)"
 
       case Pi(DontBind, Expl, t, b)  => s"($t -> $b)"
@@ -52,8 +53,10 @@ object Syntax:
       case Quote(t)  => s"`$t"
       case Splice(t) => s"$$$t"
 
-      case PairTy(fst, snd) => s"($fst ** $snd)"
-      case Pair(fst, snd)   => s"($fst, $snd)"
+      case Sigma(DontBind, t, b)  => s"($t ** $b)"
+      case Sigma(DoBind(x), t, b) => s"(($x : $t) ** $b)"
+      case PairTy(fst, snd)       => s"($fst ** $snd)"
+      case Pair(fst, snd)         => s"($fst, $snd)"
 
       case Hole(Some(x)) => s"_$x"
       case Hole(None)    => "_"
@@ -76,6 +79,7 @@ object Syntax:
       case Quote(t)  => Quote(t.removePos)
       case Splice(t) => Splice(t.removePos)
 
+      case Sigma(x, t, b)   => Sigma(x, t.removePos, b.removePos)
       case PairTy(fst, snd) => PairTy(fst.removePos, snd.removePos)
       case Pair(fst, snd)   => Pair(fst.removePos, snd.removePos)
 
@@ -97,14 +101,14 @@ object Syntax:
         val s = u.removePos match
           case App(Var(Name("U0")), Var(Name("Val")), Expl) => s"::"
           case App(Var(Name("U0")), Var(Name("Fun")), Expl) => s":"
-          case Var(Name("U1"))                        => s""
-          case _                                      => s"?"
+          case Var(Name("U1"))                              => s""
+          case _                                            => s"?"
         s"$x : $t $summon= $v;"
       case DDef(x, u, None, v) =>
         val s = u.removePos match
           case App(Var(Name("U0")), Var(Name("Val")), Expl) => s"::"
           case App(Var(Name("U0")), Var(Name("Fun")), Expl) => s":"
-          case Var(Name("U1"))                        => s""
-          case _                                      => s"?"
+          case Var(Name("U1"))                              => s""
+          case _                                            => s"?"
         s"$x $s= $v;"
   export Def.*
