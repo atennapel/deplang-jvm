@@ -54,7 +54,7 @@ object Unification:
       case VRigid(HVar(x), sp) =>
         pren.ren.get(x.expose) match
           case None     => throw UnifyError(s"escaped variable: '$x")
-          case Some(x2) => goSp(Local(pren.dom.toIx(x2)), sp)
+          case Some(x2) => goSp(Local(x2.toIx(pren.dom)), sp)
 
       case VGlobal(x, sp, v) => goSp(Global(x), sp)
 

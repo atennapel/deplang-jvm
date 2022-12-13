@@ -5,10 +5,10 @@ S1 : Nat1 -> Nat1 = \n A z s. s (n A z s);
 
 (+) : Nat1 -> Nat1 -> Nat1 = \a b. a Nat1 b S1;
 
-Id : {A : U1} -> A -> A -> U1 =
+(~) : {A : U1} -> A -> A -> U1 =
   \{A} x y. (P : A -> U1) -> P x -> P y;
 
-Refl : {A : U1} {x : A} -> Id {A} x x =
+Refl : {A : U1} {x : A} -> x ~ x =
   \P y. y;
 
 n0 = Z1;
@@ -16,4 +16,4 @@ n1 = S1 n0;
 n2 = S1 n1;
 n3 = S1 n2;
 
-proof : Id {_} (n1 + n2) n3 = Refl {_} {_};
+proof : (n1 + n2) ~ n3 = Refl;

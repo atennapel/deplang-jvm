@@ -18,6 +18,20 @@ object Elaboration:
   private def newMeta()(implicit ctx: Ctx): Tm =
     InsertedMeta(freshMeta(), ctx.bds)
 
+  private def insertPi(inp: (Ty, VTy, VTy))(implicit ctx: Ctx): (Ty, VTy, VTy) =
+    def go(tm: Ty, ty: VTy, u: VTy): (Tm, VTy, VTy) = force(ty) match
+      case VPi(x, Impl, a, u1, b, u2) =>
+        val m = newMeta()
+        val mv = ctx.eval(m)
+        go(App(tm, m, Impl), b(mv), u2)
+      case _ => (tm, ty, u)
+    go(inp._1, inp._2, inp._3)
+
+  private def insert(inp: (Tm, VTy, VTy))(implicit ctx: Ctx): (Tm, VTy, VTy) =
+    inp._1 match
+      case Lam(_, Impl, _) => inp
+      case _               => insertPi(inp)
+
   private def unify(a: VTy, b: VTy)(implicit ctx: Ctx): Unit =
     try unify0(a, b)(ctx.lvl)
     catch
@@ -185,7 +199,7 @@ object Elaboration:
         Let(x, ctx.quote(univ), et, ev, eb)
 
       case (tm, _) =>
-        val (etm, ty2, univ2) = infer(tm)
+        val (etm, ty2, univ2) = insert(infer(tm))
         debug(
           s"check inferred ${ctx.pretty(etm)} : ${ctx.pretty(ty2)} : ${ctx.pretty(univ2)}"
         )
@@ -212,12 +226,12 @@ object Elaboration:
       case S.Var(Name("U1"))  => (U1, VU1, VU1)
       case S.Var(Name("U0"))  => (U0, vpi("_", VVF, VU1, VU1, _ => VU1), VU1)
       case S.App(S.Var(Name("fst")), t, Expl) =>
-        val (et, vt, st) = infer(t)
+        val (et, vt, st) = insertPi(infer(t))
         force(vt) match
           case VPairTy(fst, snd) => (Fst(et), fst, VUVal())
           case _ => throw ElaborateError(s"expected pair type in $tm")
       case S.App(S.Var(Name("snd")), t, Expl) =>
-        val (et, vt, st) = infer(t)
+        val (et, vt, st) = insertPi(infer(t))
         force(vt) match
           case VPairTy(fst, snd) => (Snd(et), snd, VUVal())
           case _ => throw ElaborateError(s"expected pair type in $tm")
@@ -294,7 +308,9 @@ object Elaboration:
           case _ => throw ElaborateError(s"incompatible universes in pi: $tm")
         (Pi(x, i, et, ctx.quote(u1), eb, ctx.quote(u2)), u3, VU1)
       case S.App(f, a, i) =>
-        val (ef, fty, st) = infer(f)
+        val (ef, fty, st) = i match
+          case Impl => infer(f)
+          case Expl => insertPi(infer(f))
         force(fty) match
           case VPi(_, i2, t, u1, b, u2) if i == i2 =>
             val ea = check(a, t, u1)

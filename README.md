@@ -19,6 +19,7 @@ TODO:
 - [x] Staging
 - [x] IR syntax
 - [x] Metas, zonking and unification
-- [ ] Meta insertion
-- [ ] Sigmas
+- [x] Meta insertion
+- [ ] IR Lambda removal: eta expansion, closure conversion, lambda lifting
 - [ ] Bytecode generation
+- [ ] Sigmas
