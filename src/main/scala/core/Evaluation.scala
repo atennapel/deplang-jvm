@@ -56,6 +56,14 @@ object Evaluation:
     case VGlobal(x, sp, v) => VGlobal(x, SSnd(sp), () => vsnd(v()))
     case _                 => impossible()
 
+  def vspine(v: Val, sp: Spine): Val = sp match
+    case SId                   => v
+    case SApp(sp, a, i)        => vapp(vspine(v, sp), a, i)
+    case SSplice(sp)           => vsplice(vspine(v, sp))
+    case SFoldNat(sp, t, z, s) => vfoldnat(t, vspine(v, sp), z, s)
+    case SFst(sp)              => vfst(vspine(v, sp))
+    case SSnd(sp)              => vsnd(vspine(v, sp))
+
   def vmeta(id: MetaId): Val = getMeta(id) match
     case Unsolved     => VMeta(id)
     case Solved(v, _) => v
@@ -114,6 +122,10 @@ object Evaluation:
 
   def force(v: Val, unfold: Unfold = UnfoldAll): Val =
     v match
+      case VFlex(id, sp) =>
+        getMeta(id) match
+          case Unsolved     => v
+          case Solved(v, _) => force(vspine(v, sp), unfold)
       case VGlobal(_, _, v) if unfold == UnfoldAll => force(v(), UnfoldAll)
       case v                                       => v
 

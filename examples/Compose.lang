@@ -4,4 +4,4 @@
 (+) : Nat -> Nat -> Nat := \a b. foldNat a b (\_ r. S r);
 (*) : Nat -> Nat -> Nat := \a b. foldNat a 0 (\_ r. b + r);
 
-m2a1 : Nat -> Nat := (<<) {Nat} {Nat} {Nat} ((+) 1) ((*) 2);
+m2a1 : Nat -> Nat := (<<) {_} {_} {_} ((+) 1) ((*) 2);

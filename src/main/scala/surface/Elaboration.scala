@@ -7,11 +7,16 @@ import core.Value.*
 import core.Evaluation.*
 import core.Unification.{unify as unify0, UnifyError}
 import core.Globals.*
+import core.Metas.*
+import core.Zonking.*
 import Ctx.*
 import Syntax as S
 
 object Elaboration:
   final case class ElaborateError(msg: String) extends Exception(msg)
+
+  private def newMeta()(implicit ctx: Ctx): Tm =
+    InsertedMeta(freshMeta(), ctx.bds)
 
   private def unify(a: VTy, b: VTy)(implicit ctx: Ctx): Unit =
     try unify0(a, b)(ctx.lvl)
@@ -146,10 +151,7 @@ object Elaboration:
       debug(s"check $tm : ${ctx.pretty(ty)} : ${ctx.pretty(univ)}")
     (tm, force(ty)) match
       case (S.Pos(pos, tm), _) => check(tm, ty, univ)(ctx.enter(pos))
-      case (S.Hole(x), _) =>
-        throw ElaborateError(
-          s"hole found _${x.getOrElse("")} : ${ctx.pretty(ty)}"
-        )
+      case (S.Hole(x), _)      => newMeta()
       case (S.Lam(x, i1, b), VPi(_, i2, t, u1, rt, u2)) if i1 == i2 =>
         val eb = check(b, rt(VVar(ctx.lvl)), u2)(ctx.bind(x, t, u1))
         Lam(x, i1, eb)
@@ -328,15 +330,21 @@ object Elaboration:
         val (efst, t1) = infer(fst, VUVal())
         val (esnd, t2) = infer(snd, VUVal())
         (Pair(efst, esnd), VPairTy(t1, t2), VUVal())
+      case S.Hole(_) =>
+        val u = ctx.eval(newMeta())
+        val ty = ctx.eval(newMeta())
+        val tm = newMeta()
+        (tm, ty, u)
       case _ => throw ElaborateError(s"cannot infer $tm")
 
   private def elaborate(tm: S.Tm, ty: Option[S.Ty], u: VTy): (Tm, Ty) =
     debug(s"elaborate $tm")
+    resetMetas()
     val (etm, ety, _) =
       inferValue(tm, ty, u)(
         Ctx.empty((0, 0))
       ) // TODO: use source position
-    (etm, ety)
+    (zonk(etm)(lvl0, Nil), zonk(ety)(lvl0, Nil))
 
   def elaborate(d: S.Def): Def =
     debug(s"elaborate $d")
@@ -344,7 +352,7 @@ object Elaboration:
       case S.DDef(x, u, t, v) =>
         if getGlobal(x).isDefined then
           throw ElaborateError(s"global is already defined: $x")
-        val eu = checkType(u, VU1)(Ctx.empty((0, 0)))
+        val eu = zonk(checkType(u, VU1)(Ctx.empty((0, 0))))(lvl0, Nil)
         val veu = eval(eu)(Nil)
         val (ev, et) = elaborate(v, t, veu)
         setGlobal(GlobalEntry(x, ev, et, eval(ev)(Nil), eval(et)(Nil), veu))

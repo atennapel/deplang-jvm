@@ -36,3 +36,5 @@ object Metas:
   def unsolvedMetas(): List[MetaId] = metas.zipWithIndex.collect {
     case (Unsolved, ix) => metaId(ix)
   }.toList
+
+  def resetMetas(): Unit = metas.clear()

@@ -18,6 +18,7 @@ TODO:
 - [x] Pretty printing
 - [x] Staging
 - [x] IR syntax
-- [ ] Metas, unification and insertion
+- [x] Metas, zonking and unification
+- [ ] Meta insertion
 - [ ] Sigmas
 - [ ] Bytecode generation

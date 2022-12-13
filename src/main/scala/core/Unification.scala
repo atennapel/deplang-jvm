@@ -4,11 +4,106 @@ import common.Common.*
 import common.Debug.debug
 import Value.*
 import Evaluation.*
+import Syntax.*
+import Metas.*
+
+import scala.collection.immutable.IntMap
 
 object Unification:
   final case class UnifyError(msg: String) extends Exception(msg)
 
-  private def solve(id: MetaId, sp: Spine, v: Val)(implicit k: Lvl): Unit = ???
+  private final case class PRen(dom: Lvl, cod: Lvl, ren: IntMap[Lvl]):
+    def lift: PRen = PRen(dom + 1, cod + 1, ren + (cod.expose -> dom))
+
+  private def invert(sp: Spine)(implicit k: Lvl): PRen =
+    def go(sp: Spine): (Lvl, IntMap[Lvl]) = sp match
+      case SId => (lvl0, IntMap.empty)
+      case SApp(sp, t, i) =>
+        val (dom, ren) = go(sp)
+        force(t) match
+          case VVar(x) if !ren.contains(x.expose) =>
+            (dom + 1, ren + (x.expose -> dom))
+          case _ => throw UnifyError(s"non-var in meta spine")
+      case _ => throw UnifyError(s"eliminator in meta spine")
+    val (dom, ren) = go(sp)
+    PRen(dom, k, ren)
+
+  private def rename(m: MetaId, v: Val)(implicit pren: PRen): Tm =
+    def goSp(hd: Tm, sp: Spine)(implicit pren: PRen): Tm = sp match
+      case SId            => hd
+      case SApp(sp, a, i) => App(goSp(hd, sp), go(a), i)
+      case SSplice(sp)    => Splice(goSp(hd, sp))
+      case SFoldNat(sp, t, z, s) =>
+        App(
+          App(App(FoldNat(go(t)), goSp(hd, sp), Expl), go(z), Expl),
+          go(s),
+          Expl
+        )
+      case SFst(sp) => Fst(goSp(hd, sp))
+      case SSnd(sp) => Snd(goSp(hd, sp))
+
+    def goCl(c: Clos)(implicit pren: PRen): Tm =
+      go(c(VVar(pren.cod)))(pren.lift)
+
+    def go(t: Val)(implicit pren: PRen): Tm = force(t, UnfoldMetas) match
+      case VFlex(hd, sp) if m == hd =>
+        throw UnifyError(s"occurs check failed: $m")
+      case VFlex(hd, sp) => goSp(Meta(hd), sp)
+
+      case VRigid(HU0, sp) => goSp(U0, sp)
+      case VRigid(HVar(x), sp) =>
+        pren.ren.get(x.expose) match
+          case None     => throw UnifyError(s"escaped variable: '$x")
+          case Some(x2) => goSp(Local(pren.dom.toIx(x2)), sp)
+
+      case VGlobal(x, sp, v) => goSp(Global(x), sp)
+
+      case VVF    => VF
+      case VVFVal => VFVal
+      case VVFFun => VFFun
+      case VU0()  => U0
+      case VU1    => U1
+
+      case VPi(x, i, t, u1, b, u2) =>
+        Pi(
+          x,
+          i,
+          go(t),
+          go(u1),
+          goCl(b),
+          go(u2)
+        )
+      case VLam(x, i, b) => Lam(x, i, goCl(b))
+
+      case VPairTy(fst, snd) => PairTy(go(fst), go(snd))
+      case VPair(fst, snd)   => Pair(go(fst), go(snd))
+
+      case VLift(vf, v) => Lift(go(vf), go(v))
+      case VQuote(v)    => Quote(go(v))
+
+      case VNat  => Nat
+      case VZ    => Z
+      case VS(n) => S(go(n))
+
+    go(v)
+
+  private def lams(sp: Spine, b: Tm): Tm =
+    def icits(sp: Spine): List[Icit] = sp match
+      case SId            => Nil
+      case SApp(sp, _, i) => i :: icits(sp)
+      case _              => impossible()
+    def go(x: Int, is: List[Icit]): Tm = is match
+      case Nil     => b
+      case i :: is => Lam(DoBind(Name(s"x$x")), i, go(x + 1, is))
+    go(0, icits(sp).reverse)
+
+  private def solve(id: MetaId, sp: Spine, v: Val)(implicit k: Lvl): Unit =
+    debug(s"solve ?$id := ${quote(v)}")
+    implicit val pren: PRen = invert(sp)
+    val rhs = rename(id, v)
+    val solution = lams(sp, rhs)
+    debug(s"solution ?$id = $solution")
+    solveMeta(id, eval(solution)(Nil), solution)
 
   private def unify(a: Spine, b: Spine)(implicit k: Lvl): Unit = (a, b) match
     case (SId, SId)                           => ()
