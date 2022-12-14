@@ -97,10 +97,9 @@ object Evaluation:
 
     case Sigma(x, t, u1, b, u2) =>
       VSigma(x, eval(t), eval(u1), Clos(b), eval(u2))
-    case PairTy(fst, snd) => VPairTy(eval(fst), eval(snd))
-    case Pair(fst, snd)   => VPair(eval(fst), eval(snd))
-    case Fst(t)           => vfst(eval(t))
-    case Snd(t)           => vsnd(eval(t))
+    case Pair(fst, snd) => VPair(eval(fst), eval(snd))
+    case Fst(t)         => vfst(eval(t))
+    case Snd(t)         => vsnd(eval(t))
 
     case Lift(vf, t) => VLift(eval(vf), eval(t))
     case Quote(t)    => vquote(eval(t))
@@ -187,8 +186,7 @@ object Evaluation:
           quote(b, unfold),
           quote(u2, unfold)
         )
-      case VPairTy(fst, snd) => PairTy(quote(fst, unfold), quote(snd, unfold))
-      case VPair(fst, snd)   => Pair(quote(fst, unfold), quote(snd, unfold))
+      case VPair(fst, snd) => Pair(quote(fst, unfold), quote(snd, unfold))
 
       case VLift(vf, v) => Lift(quote(vf, unfold), quote(v, unfold))
       case VQuote(v)    => Quote(quote(v, unfold))

@@ -42,7 +42,6 @@ object Value:
     case VLam(name: Bind, icit: Icit, body: Clos)
 
     case VSigma(name: Bind, ty: VTy, u1: VTy, body: Clos, u2: VTy)
-    case VPairTy(fst: VTy, snd: VTy)
     case VPair(fst: Val, snd: Val)
 
     case VLift(vf: VTy, tm: VTy)

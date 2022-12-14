@@ -90,7 +90,6 @@ object Parser:
       ("^" *> atom).map(t => Lift(t)) <|>
         ("`" *> atom).map(t => Quote(t)) <|>
         ("$" *> atom).map(t => Splice(t)) <|>
-        attempt("(" *> tm <~> "**" *> tm <* ")").map(PairTy.apply) <|>
         attempt("(" *> tm <~> "," *> tm <* ")").map(Pair.apply) <|>
         ("(" *> (userOp.map(Var.apply) <|> tm) <* ")") <|>
         holeP <|>
@@ -109,20 +108,24 @@ object Parser:
     )
 
     lazy val tm: Parsley[Tm] = positioned(
-      attempt(pi) <|> let <|> lam <|>
+      attempt(piSigma) <|> let <|> lam <|>
         precedence[Tm](app)(
+          Ops(InfixR)("**" #> ((l, r) => Sigma(DontBind, l, r))),
           Ops(InfixR)("->" #> ((l, r) => Pi(DontBind, Expl, l, r)))
         )
     )
 
-    private lazy val pi: Parsley[Tm] =
+    private lazy val piSigma: Parsley[Tm] =
       positioned(
         ((some(piParam) <|> app.map(t =>
           List((List(DontBind), Expl, Some(t)))
-        )) <~> "->" *> tm)
-          .map { case (ps, rt) =>
+        )) <~> ("->" #> false <|> "**" #> true) <~> tm)
+          .map { case ((ps, prod), rt) =>
             ps.foldRight(rt) { case ((xs, i, ty), rt) =>
-              xs.foldRight(rt)((x, rt) => Pi(x, i, ty.getOrElse(hole), rt))
+              xs.foldRight(rt)((x, rt) =>
+                if prod then Sigma(x, ty.getOrElse(hole), rt)
+                else Pi(x, i, ty.getOrElse(hole), rt)
+              )
             }
           }
       )

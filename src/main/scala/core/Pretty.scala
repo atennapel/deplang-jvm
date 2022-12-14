@@ -70,7 +70,6 @@ object Pretty:
     case Nat                 => pretty(tm)
     case Z                   => pretty(tm)
     case FoldNat(t) if app   => pretty(tm)
-    case PairTy(_, _)        => pretty(tm)
     case Pair(_, _)          => pretty(tm)
     case Fst(_)              => pretty(tm)
     case Snd(_)              => pretty(tm)
@@ -102,7 +101,6 @@ object Pretty:
     case App(_, _, _)         => prettyApp(tm)
 
     case Sigma(_, _, _, _, _) => prettySigma(tm)
-    case PairTy(fst, snd)     => s"($fst ** $snd)"
     case Pair(fst, snd)       => s"($fst, $snd)"
     case Fst(t)               => s"(fst $t)"
     case Snd(t)               => s"(snd $t)"

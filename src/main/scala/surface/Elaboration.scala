@@ -150,6 +150,30 @@ object Elaboration:
               body match
                 case None => Some(Lam(pick(x1, x2), i1, App(Wk(t), coev0, i1)))
                 case Some(body) => Some(Lam(pick(x1, x2), i1, body))
+        case (VSigma(x1, a1, u11, b1, u12), VSigma(x2, a2, u21, b2, u22)) =>
+          val fst = go(Fst(t), a1, u11, a2, u21)
+          val snd = fst match
+            case None =>
+              go(
+                Snd(t),
+                b1(vfst(ctx.eval(t))),
+                u12,
+                b2(vfst(ctx.eval(t))),
+                u22
+              )
+            case Some(fst) =>
+              go(
+                Snd(t),
+                b1(vfst(ctx.eval(t))),
+                u12,
+                b2(ctx.eval(fst)),
+                u22
+              )
+          (fst, snd) match
+            case (None, None)           => None
+            case (Some(fst), None)      => Some(Pair(fst, Snd(t)))
+            case (None, Some(snd))      => Some(Pair(Fst(t), snd))
+            case (Some(fst), Some(snd)) => Some(Pair(fst, snd))
         case (VU(vf), VU1) => Some(Lift(ctx.quote(vf), t))
         case (VLift(r1, a), VLift(r2, b)) =>
           unify(r1, r2)
@@ -184,6 +208,19 @@ object Elaboration:
           case VU1 => throw ElaborateError(s"invalid universes: $tm")
           case _   =>
         Pi(x, i, et, ctx.quote(VUVal()), eb, ctx.quote(u2))
+
+      case (S.Sigma(x, t, b), VU1) =>
+        val et = checkType(t, VU1)
+        val eb = checkType(b, VU1)(ctx.bind(x, ctx.eval(et), VU1))
+        Sigma(x, et, U1, eb, U1)
+      case (S.Sigma(x, t, b), VUVal()) =>
+        val et = checkType(t, VUVal())
+        val eb = checkType(b, VUVal())(ctx.bind(x, ctx.eval(et), VUVal()))
+        Sigma(x, et, App(U0, VFVal, Expl), eb, App(U0, VFVal, Expl))
+      case (S.Pair(fst, snd), VSigma(x, t, u1, b, u2)) =>
+        val efst = check(fst, t, u1)
+        val esnd = check(snd, b(ctx.eval(efst)), u2)
+        Pair(efst, esnd)
 
       // case (S.Lift(ty), VType(S1)) =>
       //  Lift(checkType(ty, S0(RVal)))
@@ -228,13 +265,14 @@ object Elaboration:
       case S.App(S.Var(Name("fst")), t, Expl) =>
         val (et, vt, st) = insertPi(infer(t))
         force(vt) match
-          case VPairTy(fst, snd) => (Fst(et), fst, VUVal())
-          case _ => throw ElaborateError(s"expected pair type in $tm")
+          case VSigma(_, fst, u1, snd, u2) => (Fst(et), fst, u1)
+          case _ => throw ElaborateError(s"expected sigma type in $tm")
       case S.App(S.Var(Name("snd")), t, Expl) =>
         val (et, vt, st) = insertPi(infer(t))
         force(vt) match
-          case VPairTy(fst, snd) => (Snd(et), snd, VUVal())
-          case _ => throw ElaborateError(s"expected pair type in $tm")
+          case VSigma(_, fst, u1, snd, u2) =>
+            (Snd(et), snd(ctx.eval(Fst(et))), u2)
+          case _ => throw ElaborateError(s"expected sigma type in $tm")
       case S.Var(Name("Nat")) => (Nat, VUVal(), VU1)
       case S.Var(Name("Z"))   => (Z, VNat, VUVal())
       case S.App(S.Var(Name("S")), n, Expl) =>
@@ -307,6 +345,20 @@ object Elaboration:
           case (VUVal(), VUVal()) => VUFun()
           case _ => throw ElaborateError(s"incompatible universes in pi: $tm")
         (Pi(x, i, et, ctx.quote(u1), eb, ctx.quote(u2)), u3, VU1)
+      case S.Sigma(x, t, b) =>
+        val (et, u1, _) = inferType(t)
+        val (eb, u2) = force(u1) match
+          case VU1 =>
+            val eb = checkType(b, VU1)(ctx.bind(x, ctx.eval(et), VU1))
+            (eb, VU1)
+          case VUVal() =>
+            val eb = checkType(b, VUVal())(ctx.bind(x, ctx.eval(et), VUVal()))
+            (eb, VUVal())
+          case u =>
+            throw ElaborateError(
+              s"sigma parameter universe must be U1 or U0 Val, not ${ctx.pretty(u)}"
+            )
+        (Sigma(x, et, ctx.quote(u1), eb, ctx.quote(u2)), u2, VU1)
       case S.App(f, a, i) =>
         val (ef, fty, st) = i match
           case Impl => infer(f)
@@ -338,14 +390,20 @@ object Elaboration:
           case _ => throw ElaborateError(s"expected a lifted type in $tm")
         val (et2, vt2) = adjustStage(et1, vt, VU1, VU(vf))
         (et2, vt2, VU(vf))
-      case S.PairTy(fst, snd) =>
-        val efst = checkType(fst, VUVal())
-        val esnd = checkType(snd, VUVal())
-        (PairTy(efst, esnd), VUVal(), VU1)
       case S.Pair(fst, snd) =>
-        val (efst, t1) = infer(fst, VUVal())
-        val (esnd, t2) = infer(snd, VUVal())
-        (Pair(efst, esnd), VPairTy(t1, t2), VUVal())
+        val (efst, t1, u1) = infer(fst)
+        val (esnd, t2, u2) = force(u1) match
+          case VU1 =>
+            val (esnd, t2) = infer(snd, VU1)
+            (esnd, t2, VU1)
+          case VUVal() =>
+            val (esnd, t2) = infer(snd, VUVal())
+            (esnd, t2, VUVal())
+          case u =>
+            throw ElaborateError(
+              s"invalid universe in snd of pair: ${ctx.pretty(u)}"
+            )
+        (Pair(efst, esnd), VSigma(DontBind, t1, u1, CFun(_ => t2), u2), u2)
       case S.Hole(_) =>
         val u = ctx.eval(newMeta())
         val ty = ctx.eval(newMeta())

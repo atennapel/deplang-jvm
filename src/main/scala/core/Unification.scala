@@ -83,8 +83,7 @@ object Unification:
           goCl(b),
           go(u2)
         )
-      case VPairTy(fst, snd) => PairTy(go(fst), go(snd))
-      case VPair(fst, snd)   => Pair(go(fst), go(snd))
+      case VPair(fst, snd) => Pair(go(fst), go(snd))
 
       case VLift(vf, v) => Lift(go(vf), go(v))
       case VQuote(v)    => Quote(go(v))
@@ -142,8 +141,7 @@ object Unification:
         unify(t1, t2); unify(u11, u21); unify(b1, b2); unify(u12, u22)
       case (VSigma(_, t1, u11, b1, u12), VSigma(_, t2, u21, b2, u22)) =>
         unify(t1, t2); unify(u11, u21); unify(b1, b2); unify(u12, u22)
-      case (VPair(a1, b1), VPair(a2, b2))     => unify(a1, a2); unify(b1, b2)
-      case (VPairTy(a1, b1), VPairTy(a2, b2)) => unify(a1, a2); unify(b1, b2)
+      case (VPair(a1, b1), VPair(a2, b2)) => unify(a1, a2); unify(b1, b2)
       case (VRigid(h1, sp1), VRigid(h2, sp2)) if h1 == h2 => unify(sp1, sp2)
 
       case (VLam(_, i1, b1), VLam(_, i2, b2)) if i1 == i2 => unify(b1, b2)

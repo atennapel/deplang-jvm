@@ -13,7 +13,6 @@ object Syntax:
     case App(fn: Tm, arg: Tm, icit: Icit)
 
     case Sigma(name: Bind, ty: Ty, body: Ty)
-    case PairTy(fst: Ty, snd: Ty)
     case Pair(fst: Tm, snd: Tm)
 
     case Lift(tm: Ty)
@@ -55,7 +54,6 @@ object Syntax:
 
       case Sigma(DontBind, t, b)  => s"($t ** $b)"
       case Sigma(DoBind(x), t, b) => s"(($x : $t) ** $b)"
-      case PairTy(fst, snd)       => s"($fst ** $snd)"
       case Pair(fst, snd)         => s"($fst, $snd)"
 
       case Hole(Some(x)) => s"_$x"
@@ -79,9 +77,8 @@ object Syntax:
       case Quote(t)  => Quote(t.removePos)
       case Splice(t) => Splice(t.removePos)
 
-      case Sigma(x, t, b)   => Sigma(x, t.removePos, b.removePos)
-      case PairTy(fst, snd) => PairTy(fst.removePos, snd.removePos)
-      case Pair(fst, snd)   => Pair(fst.removePos, snd.removePos)
+      case Sigma(x, t, b) => Sigma(x, t.removePos, b.removePos)
+      case Pair(fst, snd) => Pair(fst.removePos, snd.removePos)
 
       case Pos(_, t) => t
 

@@ -70,8 +70,7 @@ object Zonking:
 
     case Sigma(x, t, u1, b, u2) =>
       Sigma(x, zonk(t), zonk(u1), zonkLift(b), zonk(u2))
-    case PairTy(fst, snd) => PairTy(zonk(fst), zonk(snd))
-    case Pair(fst, snd)   => Pair(zonk(fst), zonk(snd))
+    case Pair(fst, snd) => Pair(zonk(fst), zonk(snd))
 
     case Lift(vf, t) => Lift(zonk(vf), zonk(t))
     case Quote(t)    => Quote(zonk(t))

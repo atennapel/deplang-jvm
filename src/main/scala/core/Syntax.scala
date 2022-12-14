@@ -20,7 +20,6 @@ object Syntax:
     case App(fn: Tm, arg: Tm, icit: Icit)
 
     case Sigma(name: Bind, ty: Ty, u1: Ty, body: Ty, u2: Ty)
-    case PairTy(fst: Ty, snd: Ty)
     case Pair(fst: Tm, snd: Tm)
     case Fst(tm: Tm)
     case Snd(tm: Tm)
@@ -67,7 +66,6 @@ object Syntax:
 
       case Sigma(DontBind, t, u1, b, u2)  => s"($t **{$u1}{$u2} $b)"
       case Sigma(DoBind(x), t, u1, b, u2) => s"(($x : $t) **{$u1}{$u2} $b)"
-      case PairTy(fst, snd)               => s"($fst ** $snd)"
       case Pair(fst, snd)                 => s"($fst, $snd)"
       case Fst(t)                         => s"(fst $t)"
       case Snd(t)                         => s"(snd $t)"

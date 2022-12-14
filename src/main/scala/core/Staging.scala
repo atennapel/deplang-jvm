@@ -73,7 +73,6 @@ object Staging:
     case U1    => VU1
 
     case Nat                  => VNat1
-    case PairTy(a, b)         => VPairTy1(eval1(a), eval1(b))
     case Sigma(_, a, _, b, _) => VPairTy1(eval1(a), eval1(b))
 
     case Pi(x, _, a, _, b, u) => VFun1(eval1(a), eval1(u), eval1(b))
