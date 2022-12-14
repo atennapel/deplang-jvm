@@ -3,6 +3,7 @@ import surface.Elaboration.elaborate
 import core.Pretty.pretty
 import core.Staging.stage
 import common.Debug.setDebug
+import ir.Simplifier.simplify
 
 import java.io.File
 import scala.io.Source
@@ -21,3 +22,6 @@ object Main:
     println("staged:")
     val sds = stage(cds)
     println(sds)
+    println("simplify:")
+    val simp = simplify(sds)
+    println(simp)
