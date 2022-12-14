@@ -16,13 +16,15 @@ object Syntax:
     override def toString: String = params match
       case Nil => retrn.toString
       case ps  => s"(${ps.mkString(" -> ")} -> $retrn)"
+  object TDef:
+    def apply(t: Ty): TDef = TDef(Nil, t)
 
   enum Tm:
-    case Local(ix: Ix)
-    case Global(name: Name)
-    case Let(name: Name, ty: TDef, value: Tm, body: Tm)
+    case Local(name: Int, ty: TDef)
+    case Global(name: Name, ty: TDef)
+    case Let(name: Int, ty: TDef, value: Tm, body: Tm)
 
-    case Lam(name: Bind, body: Tm)
+    case Lam(name: Int, t1: Ty, t2: TDef, body: Tm)
     case App(fn: Tm, arg: Tm)
 
     case Pair(fst: Tm, snd: Tm)
@@ -35,13 +37,13 @@ object Syntax:
     case FoldNat(ty: Ty)
 
     override def toString: String = this match
-      case Local(x)  => s"'$x"
-      case Global(x) => s"$x"
+      case Local(x, _)  => s"'$x"
+      case Global(x, _) => s"$x"
       case Let(x, t, v, b) =>
-        s"(let $x : $t = $v in $b)"
+        s"(let '$x : $t = $v in $b)"
 
-      case Lam(x, b) => s"(\\$x. $b)"
-      case App(f, a) => s"($f $a)"
+      case Lam(x, _, _, b) => s"(\\'$x. $b)"
+      case App(f, a)       => s"($f $a)"
 
       case Pair(fst, snd) => s"($fst, $snd)"
       case Fst(t)         => s"(fst $t)"

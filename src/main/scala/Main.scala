@@ -1,8 +1,8 @@
-import common.Debug.setDebug
 import surface.Parser.parser
 import surface.Elaboration.elaborate
 import core.Pretty.pretty
 import core.Staging.stage
+import common.Debug.setDebug
 
 import java.io.File
 import scala.io.Source

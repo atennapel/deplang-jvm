@@ -6,6 +6,8 @@ import Syntax.*
 import ir.Syntax as IR
 import Globals.getGlobal
 
+import scala.collection.mutable
+
 object Staging:
   private enum Env:
     case Empty
@@ -126,26 +128,43 @@ object Staging:
 
     case _ => impossible()
 
-  private def quote0ir(v: Val0)(implicit k: Lvl): IR.Tm = v match
-    case VVar0(l)    => IR.Local(l.toIx)
-    case VGlobal0(x) => IR.Global(x)
-    case VApp0(f, a) => IR.App(quote0ir(f), quote0ir(a))
-    case VLam0(x, b) => IR.Lam(x, quote0ir(b(VVar0(k)))(k + 1))
+  // staging
+  private enum Tmp:
+    case Local(ix: Ix)
+    case Global(name: Name)
+    case Let(name: Name, ty: IR.TDef, value: Tmp, body: Tmp)
+
+    case Lam(name: Bind, body: Tmp)
+    case App(fn: Tmp, arg: Tmp)
+
+    case Pair(fst: Tmp, snd: Tmp)
+    case Fst(tm: Tmp)
+    case Snd(tm: Tmp)
+
+    case Z
+    case S(n: Tmp)
+    case FoldNat(ty: IR.Ty)
+
+  private def quote0ir(v: Val0)(implicit k: Lvl): Tmp = v match
+    case VVar0(l)    => Tmp.Local(l.toIx)
+    case VGlobal0(x) => Tmp.Global(x)
+    case VApp0(f, a) => Tmp.App(quote0ir(f), quote0ir(a))
+    case VLam0(x, b) => Tmp.Lam(x, quote0ir(b(VVar0(k)))(k + 1))
     case VLet0(x, VU0app(VVFVal1), t, v, b) =>
-      IR.Let(
+      Tmp.Let(
         x,
-        IR.TDef(Nil, quote1ty(t)),
+        IR.TDef(quote1ty(t)),
         quote0ir(v),
         quote0ir(b(VVar0(k)))(k + 1)
       )
     case VLet0(x, VU0app(VVFFun1), t, v, b) =>
-      IR.Let(x, quote1tdef(t), quote0ir(v), quote0ir(b(VVar0(k)))(k + 1))
-    case VZ0              => IR.Z
-    case VS0(n)           => IR.S(quote0ir(n))
-    case VFoldNat0(t)     => IR.FoldNat(quote1ty(t))
-    case VPair0(fst, snd) => IR.Pair(quote0ir(fst), quote0ir(snd))
-    case VFst0(t)         => IR.Fst(quote0ir(t))
-    case VSnd0(t)         => IR.Snd(quote0ir(t))
+      Tmp.Let(x, quote1tdef(t), quote0ir(v), quote0ir(b(VVar0(k)))(k + 1))
+    case VZ0              => Tmp.Z
+    case VS0(n)           => Tmp.S(quote0ir(n))
+    case VFoldNat0(t)     => Tmp.FoldNat(quote1ty(t))
+    case VPair0(fst, snd) => Tmp.Pair(quote0ir(fst), quote0ir(snd))
+    case VFst0(t)         => Tmp.Fst(quote0ir(t))
+    case VSnd0(t)         => Tmp.Snd(quote0ir(t))
     case _                => impossible()
 
   private def quote1ty(v: Val1)(implicit k: Lvl): IR.Ty = v match
@@ -161,7 +180,7 @@ object Staging:
     case VFun1(a, VU0app(VVFFun1), b) => quote1tdef(b, quote1ty(a) :: ps)
     case t                            => impossible()
 
-  private def stageIR(tm: Tm): IR.Tm =
+  private def stageIR(tm: Tm): Tmp =
     debug(s"stageIR $tm")
     quote0ir(eval0(tm)(Empty))(lvl0)
 
@@ -173,13 +192,116 @@ object Staging:
     debug(s"stageIRDef $tm")
     quote1tdef(eval1(tm)(Empty))(lvl0)
 
-  private def stage(d: Def): Option[IR.Def] = d match
-    case DDef(x, u, t, v) =>
-      eval1(u)(Empty) match
-        case VU0app(VVFVal1) =>
-          Some(IR.DDef(x, IR.TDef(Nil, stageIRTy(t)), stageIR(v)))
-        case VU0app(VVFFun1) => Some(IR.DDef(x, stageIRTDef(t), stageIR(v)))
-        case _               => None
-    case _ => None
+  /* translate to IR
+      - use named variables
+      - store types in local variables
+      - store param and return type in lambda
+   */
+  private final case class Ctx(
+      types: List[IR.TDef],
+      names: List[Int]
+  ):
+    def bind(ty: IR.TDef): (Int, Ctx) =
+      val n = if names.isEmpty then 0 else names.max + 1
+      (n, Ctx(ty :: types, n :: names))
+  private object Ctx:
+    def empty: Ctx = Ctx(Nil, Nil)
 
-  def stage(ds: Defs): IR.Defs = IR.Defs(ds.toList.flatMap(stage))
+  private type GlobalsTy = mutable.Map[Name, IR.TDef]
+
+  private def check(tm: Tmp, ty: IR.TDef)(implicit
+      ctx: Ctx,
+      globals: GlobalsTy
+  ): IR.Tm =
+    (tm, ty) match
+      case (Tmp.Lam(x, b), IR.TDef(pt :: ps, rt)) =>
+        val (n, nctx) = ctx.bind(IR.TDef(pt))
+        val eb = check(b, IR.TDef(ps, rt))(nctx, globals)
+        IR.Lam(n, pt, IR.TDef(ps, rt), eb)
+      case (Tmp.Let(x, t, v, b), ty) =>
+        val ev = check(v, t)
+        val (n, nctx) = ctx.bind(t)
+        val eb = check(b, ty)(nctx, globals)
+        IR.Let(n, t, ev, eb)
+      case _ =>
+        val (etm, ty2) = infer(tm)
+        if ty2 != ty then impossible()
+        etm
+
+  private def check(tm: Tmp, ty: IR.Ty)(implicit
+      ctx: Ctx,
+      globals: GlobalsTy
+  ): IR.Tm = check(tm, IR.TDef(ty))
+
+  private def infer(
+      tm: Tmp
+  )(implicit ctx: Ctx, globals: GlobalsTy): (IR.Tm, IR.TDef) = tm match
+    case Tmp.Local(ix) =>
+      val ty = ctx.types(ix.expose)
+      val n = ctx.names(ix.expose)
+      (IR.Local(n, ty), ty)
+    case Tmp.Global(x) =>
+      val ty = globals(x)
+      (IR.Global(x, ty), ty)
+    case Tmp.Let(x, t, v, b) =>
+      val ev = check(v, t)
+      val (n, nctx) = ctx.bind(t)
+      val (eb, rt) = infer(b)(nctx, globals)
+      (IR.Let(n, t, ev, eb), rt)
+
+    case Tmp.App(Tmp.App(Tmp.App(Tmp.FoldNat(ty), n), z), s) =>
+      val en = check(n, IR.TNat)
+      val ez = check(z, ty)
+      val es = check(s, IR.TDef(List(IR.TNat, ty), ty))
+      (IR.App(IR.App(IR.App(IR.FoldNat(ty), en), ez), es), IR.TDef(ty))
+    case Tmp.App(f, a) =>
+      val (ef, ft) = infer(f)
+      ft match
+        case IR.TDef(t :: rest, rt) =>
+          val ea = check(a, t)
+          (IR.App(ef, ea), IR.TDef(rest, rt))
+        case _ => impossible()
+
+    case Tmp.Pair(fst, snd) =>
+      val (efst, fstty) = infer(fst)
+      val (esnd, sndty) = infer(snd)
+      if fstty.params.nonEmpty || sndty.params.nonEmpty then impossible()
+      (IR.Pair(efst, esnd), IR.TDef(IR.TPair(fstty.retrn, sndty.retrn)))
+    case Tmp.Fst(t) =>
+      val (et, ty) = infer(t)
+      ty match
+        case IR.TDef(Nil, IR.TPair(fst, _)) => (IR.Fst(et), IR.TDef(fst))
+        case _                              => impossible()
+    case Tmp.Snd(t) =>
+      val (et, ty) = infer(t)
+      ty match
+        case IR.TDef(Nil, IR.TPair(_, snd)) => (IR.Snd(et), IR.TDef(snd))
+        case _                              => impossible()
+
+    case Tmp.Z => (IR.Z, IR.TDef(IR.TNat))
+    case Tmp.S(n) =>
+      val en = check(n, IR.TNat)
+      (IR.S(en), IR.TDef(IR.TNat))
+
+    case _ => impossible()
+
+  private def stage(d: Def)(implicit globals: GlobalsTy): Option[IR.Def] =
+    d match
+      case DDef(x, u, t, v) =>
+        eval1(u)(Empty) match
+          case VU0app(VVFVal1) =>
+            val ty = IR.TDef(stageIRTy(t))
+            val tm = check(stageIR(v), ty)(Ctx.empty, globals)
+            globals += (x -> ty)
+            Some(IR.DDef(x, ty, tm))
+          case VU0app(VVFFun1) =>
+            val ty = stageIRTDef(t)
+            val tm = check(stageIR(v), ty)(Ctx.empty, globals)
+            globals += (x -> ty)
+            Some(IR.DDef(x, ty, tm))
+          case _ => None
+      case _ => None
+
+  def stage(ds: Defs): IR.Defs =
+    implicit val globals: GlobalsTy = mutable.Map.empty
+    IR.Defs(ds.toList.flatMap(stage))

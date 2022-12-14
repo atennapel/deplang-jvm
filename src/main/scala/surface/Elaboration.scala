@@ -279,9 +279,16 @@ object Elaboration:
         val en = check(n, VNat, VUVal())
         (NatS(en), VNat, VUVal())
       case S.Var(Name("S")) =>
+        val sty = vpi("_", VNat, VUVal(), VUVal(), _ => VNat)
         (
-          Lam(DoBind(Name("x")), Expl, NatS(Local(ix0))),
-          vpi("_", VNat, VUVal(), VUVal(), _ => VNat),
+          Let(
+            Name("s"),
+            ctx.quote(VUFun()),
+            ctx.quote(sty),
+            Lam(DoBind(Name("x")), Expl, NatS(Local(ix0))),
+            Local(ix0)
+          ),
+          sty,
           VUFun()
         )
       /*

@@ -1,3 +1,5 @@
 id1 : {A : U0 Val} -> A -> A = \x. x;
 
 n : Nat ::= id1 0;
+
+n2 : Nat ::= (let id : Nat -> Nat -> Nat := \y x. x in id 0) 0;
