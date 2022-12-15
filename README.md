@@ -27,9 +27,10 @@ TODO:
   - [x] Parsing
   - [x] Elaboration
 - [x] IR simplifier
-- [ ] IR lambda removal: eta expansion, closure conversion, lambda lifting
+- [x] IR lambda removal: eta expansion, closure conversion, lambda lifting
 - [ ] Bytecode generation
 - [ ] Named sigma projection
 - [ ] Void, Unit, Bool types
 - [ ] Datatypes
-- [ ] More simplification: case-of-case, global inlining, constant inlining, app and case commutation
+- [ ] More simplification: case-of-case, app and case commutation
+- [ ] Better inlining (inline linear lambdas, constants, globals)

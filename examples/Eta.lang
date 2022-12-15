@@ -1,0 +1,10 @@
+add : Nat -> Nat -> Nat := \a b. a;
+
+papp : Nat -> Nat := add 0;
+
+lettest : Nat -> (Nat ** Nat) := \x. let x ::= x in (x, x);
+
+letlambda : Nat -> Nat ** Nat := \x.
+  let id : Nat -> Nat ** Nat
+    := \y. (y, x) in
+  id x;

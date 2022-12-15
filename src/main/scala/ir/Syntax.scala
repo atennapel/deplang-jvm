@@ -18,6 +18,7 @@ object Syntax:
       case ps  => s"(${ps.mkString(" -> ")} -> $retrn)"
   object TDef:
     def apply(t: Ty): TDef = TDef(Nil, t)
+    def apply(t: Ty, rt: TDef): TDef = TDef(t :: rt.params, rt.retrn)
 
   enum Tm:
     case Local(name: Int, ty: TDef)
@@ -65,6 +66,13 @@ object Syntax:
         val (hd, as) = f.flattenApps
         (hd, as ++ List(a))
       case t => (t, Nil)
+
+    def lams(ps: List[(Int, Ty)], rt: Ty): Tm =
+      ps.foldRight[(Tm, TDef)]((this, TDef(rt))) { case ((x, t), (b, rt)) =>
+        (Lam(x, t, rt, b), TDef(t :: rt.params, rt.retrn))
+      }._1
+
+    def apps(args: List[Tm]) = args.foldLeft(this)(App.apply)
 
     def freeVars: List[(Int, TDef)] = this match
       case Local(x, t) => List((x, t))

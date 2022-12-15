@@ -4,6 +4,7 @@ import core.Pretty.pretty
 import core.Staging.stage
 import common.Debug.setDebug
 import ir.Simplifier.simplify
+import ir.Compiler.compile
 
 import java.io.File
 import scala.io.Source
@@ -17,11 +18,14 @@ object Main:
     val moduleName = filename.dropRight(5)
     val ds = parser.parseFromFile(new File(filename)).flatMap(_.toTry).get
     val cds = elaborate(ds)
-    println("elaborated:")
+    println("elaborate:")
     println(pretty(cds)(Nil))
-    println("staged:")
+    println("stage:")
     val sds = stage(cds)
     println(sds)
     println("simplify:")
     val simp = simplify(sds)
     println(simp)
+    println("compile to jvm ir:")
+    val jvmir = compile(simp)
+    println(jvmir)

@@ -32,6 +32,7 @@ object Staging:
     case VNat1
     case VFun1(left: Val1, vf: Val1, right: Val1)
     case VPairTy1(fst: Val1, snd: Val1)
+    case VPair1(fst: Val1, snd: Val1)
   import Val1.*
 
   private enum Val0:
@@ -61,6 +62,14 @@ object Staging:
     case VU0      => VU0app(a)
     case _        => impossible()
 
+  private def vfst1(p: Val1): Val1 = p match
+    case VPair1(fst, _) => fst
+    case _              => impossible()
+
+  private def vsnd1(p: Val1): Val1 = p match
+    case VPair1(_, snd) => snd
+    case _              => impossible()
+
   private def eval1Bind(t: Tm, u: Val1)(implicit env: Env): Val1 =
     eval1(t)(Def1(env, u))
 
@@ -74,8 +83,12 @@ object Staging:
     case U0    => VU0
     case U1    => VU1
 
-    case Nat                  => VNat1
+    case Nat => VNat1
+
     case Sigma(_, a, _, b, _) => VPairTy1(eval1(a), eval1(b))
+    case Pair(fst, snd)       => VPair1(eval1(fst), eval1(snd))
+    case Fst(t)               => vfst1(eval1(t))
+    case Snd(t)               => vsnd1(eval1(t))
 
     case Pi(x, _, a, _, b, u) => VFun1(eval1(a), eval1(u), eval1(b))
     case Lam(x, _, b)         => VLam1(v => eval1Bind(b, v))
