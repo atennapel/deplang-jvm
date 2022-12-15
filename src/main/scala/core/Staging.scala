@@ -279,16 +279,18 @@ object Staging:
       val (efst, fstty) = infer(fst)
       val (esnd, sndty) = infer(snd)
       if fstty.params.nonEmpty || sndty.params.nonEmpty then impossible()
-      (IR.Pair(efst, esnd), IR.TDef(IR.TPair(fstty.retrn, sndty.retrn)))
+      val t1 = fstty.retrn
+      val t2 = sndty.retrn
+      (IR.Pair(t1, t2, efst, esnd), IR.TDef(IR.TPair(t1, t2)))
     case Tmp.Fst(t) =>
       val (et, ty) = infer(t)
       ty match
-        case IR.TDef(Nil, IR.TPair(fst, _)) => (IR.Fst(et), IR.TDef(fst))
+        case IR.TDef(Nil, IR.TPair(fst, _)) => (IR.Fst(fst, et), IR.TDef(fst))
         case _                              => impossible()
     case Tmp.Snd(t) =>
       val (et, ty) = infer(t)
       ty match
-        case IR.TDef(Nil, IR.TPair(_, snd)) => (IR.Snd(et), IR.TDef(snd))
+        case IR.TDef(Nil, IR.TPair(_, snd)) => (IR.Snd(snd, et), IR.TDef(snd))
         case _                              => impossible()
 
     case Tmp.Z => (IR.Z, IR.TDef(IR.TNat))

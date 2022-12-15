@@ -55,11 +55,11 @@ object Simplifier:
       Some(c)
     case App(f, a) => go2(f, a).map(App.apply)
 
-    case Pair(fst, snd)    => go2(fst, snd).map(Pair.apply)
-    case Fst(Pair(fst, _)) => Some(fst)
-    case Snd(Pair(_, snd)) => Some(snd)
-    case Fst(t)            => go(t).map(Fst.apply)
-    case Snd(t)            => go(t).map(Snd.apply)
+    case Pair(t1, t2, fst, snd)     => go2(fst, snd).map(Pair(t1, t2, _, _))
+    case Fst(_, Pair(_, _, fst, _)) => Some(fst)
+    case Snd(_, Pair(_, _, _, snd)) => Some(snd)
+    case Fst(ty, t)                 => go(t).map(Fst(ty, _))
+    case Snd(ty, t)                 => go(t).map(Snd(ty, _))
 
     case Z          => None
     case S(n)       => go(n).map(S.apply)

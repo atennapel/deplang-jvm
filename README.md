@@ -6,6 +6,8 @@ We have a language with two layers, one compile-time layer with full dependent t
 Try it out:
 ```
 sbt "run examples/Test"
+javac jvmstd/Pair.java
+java Test
 ```
 
 TODO:
@@ -29,8 +31,14 @@ TODO:
 - [x] IR simplifier
 - [x] IR lambda removal: eta expansion, closure conversion, lambda lifting
 - [ ] Bytecode generation
+  - [x] Primitives
+  - [x] Boxing/unboxing
+  - [x] foldNat
+  - [ ] main method
 - [ ] Named sigma projection
-- [ ] Void, Unit, Bool types
+- [ ] Change Nat to Int and add binops
+- [ ] Bool type with if expression
+- [ ] Top-level recursion and basic tail-recursion
 - [ ] Datatypes
 - [ ] More simplification: case-of-case, app and case commutation
 - [ ] Better inlining (inline linear lambdas, constants, globals)

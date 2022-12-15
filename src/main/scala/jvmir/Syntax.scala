@@ -5,11 +5,11 @@ import common.Common.*
 object Syntax:
   enum Ty:
     case TNat
-    case TPair(fst: Ty, snd: Ty)
+    case TPair
 
     override def toString: String = this match
-      case TNat            => "Nat"
-      case TPair(fst, snd) => s"($fst ** $snd)"
+      case TNat  => "Nat"
+      case TPair => s"Pair"
   export Ty.*
 
   final case class TDef(params: List[Ty], retrn: Ty):
@@ -33,6 +33,9 @@ object Syntax:
     case S(n: Tm)
     case FoldNat(ty: Ty, n: Tm, z: Tm, x1: Int, x2: Int, s: Tm)
 
+    case Box(ty: Ty, tm: Tm)
+    case Unbox(ty: Ty, tm: Tm)
+
     override def toString: String = this match
       case Arg(ix, _)        => s"'arg$ix"
       case Local(x, _)       => s"'$x"
@@ -49,6 +52,9 @@ object Syntax:
       case S(n) => s"(S $n)"
       case FoldNat(t, n, z, x1, x2, s) =>
         s"(foldNat {$t} $n $z ('$x1 '$x2. $s))"
+
+      case Box(ty, tm)   => s"(box {$ty} $tm)"
+      case Unbox(ty, tm) => s"(unbox {$ty} $tm)"
 
     def toInt: Option[Int] = this match
       case Z    => Some(0)

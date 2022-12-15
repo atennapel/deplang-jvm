@@ -5,6 +5,7 @@ import core.Staging.stage
 import common.Debug.setDebug
 import ir.Simplifier.simplify
 import ir.Compiler.compile
+import jvmir.Generator.generate
 
 import java.io.File
 import scala.io.Source
@@ -15,7 +16,7 @@ object Main:
     setDebug(false)
     var filename = filename0
     if !filename.endsWith(".lang") then filename = s"$filename0.lang"
-    val moduleName = filename.dropRight(5)
+    val moduleName = filename.dropRight(5).split("/").last
     val ds = parser.parseFromFile(new File(filename)).flatMap(_.toTry).get
     val cds = elaborate(ds)
     println("elaborate:")
@@ -29,3 +30,5 @@ object Main:
     println("compile to jvm ir:")
     val jvmir = compile(simp)
     println(jvmir)
+    println("generate JVM bytecode")
+    generate(moduleName, jvmir)

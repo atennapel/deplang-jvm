@@ -15,17 +15,30 @@ import scala.collection.mutable
 object Compiler:
   def compile(ds: Defs): IR.Defs = IR.Defs(ds.toList.flatMap(go))
 
+  // normalize def name based on jvm limitations
+  private def norm(x: Name): Name =
+    Name(
+      x.expose
+        .replace(".", "$_DOT_$")
+        .replace(";", "$_SEMICOLON_$")
+        .replace("[", "$_BRACKET_$")
+        .replace("/", "$_SLASH_$")
+        .replace("<", "$_ANGLELEFT_$")
+        .replace(">", "$_ANGLERIGHT_$")
+        .replace(":", "$_COLON_$")
+    )
+
   private def go(d: Def): List[IR.Def] = d match
     case DDef(x, t, v) =>
       val (ps, rt, b) = etaExpand(t, v)
-      implicit val name: Name = x
+      implicit val name: Name = norm(x)
       implicit val args: Args = ps.zipWithIndex.map { case ((x, _), ix) =>
         x -> ix
       }.toMap
       implicit val newDefs: NewDefs = mutable.ArrayBuffer.empty
       implicit val uniq: Ref[Int] = Ref(0)
       val newdef =
-        IR.DDef(x, false, ps.map((_, t) => go(t)), go(t.retrn), go(b))
+        IR.DDef(name, false, ps.map((_, t) => go(t)), go(t.retrn), go(b))
       newDefs.toList ++ List(newdef)
 
   private type Args = Map[Int, Int]
@@ -41,7 +54,7 @@ object Compiler:
           case None     => IR.Local(x, goTy(t))
       case Global(x, t) =>
         if t.params.nonEmpty then impossible()
-        IR.Global(x, go(t), Nil)
+        IR.Global(norm(x), go(t), Nil)
       case Let(x, TDef(Nil, t), v, b) =>
         IR.Let(x, go(t), go(v), go(b)(name, args - x, defs, uniq))
 
@@ -66,18 +79,26 @@ object Compiler:
             IR.FoldNat(go(t), go(n), go(z), sps(0)._1, sps(1)._1, go(s))
           case _ => impossible()
 
-      case Pair(fst, snd) => IR.Pair(go(fst), go(snd))
-      case Fst(t)         => IR.Fst(go(t))
-      case Snd(t)         => IR.Snd(go(t))
+      case Pair(t1, t2, fst, snd) => IR.Pair(box(t1, go(fst)), box(t2, go(snd)))
+      case Fst(ty, t)             => unbox(ty, IR.Fst(go(t)))
+      case Snd(ty, t)             => unbox(ty, IR.Snd(go(t)))
 
       case Z    => IR.Z
       case S(n) => IR.S(go(n))
 
       case _ => impossible()
 
+  private def box(ty: Ty, tm: IR.Tm): IR.Tm = ty match
+    case TNat => IR.Box(go(ty), tm)
+    case _    => tm
+
+  private def unbox(ty: Ty, tm: IR.Tm): IR.Tm = ty match
+    case TNat => IR.Unbox(go(ty), tm)
+    case _    => tm
+
   private def go(t: Ty): IR.Ty = t match
-    case TNat            => IR.TNat
-    case TPair(fst, snd) => IR.TPair(go(fst), go(snd))
+    case TNat        => IR.TNat
+    case TPair(_, _) => IR.TPair
 
   private def go(t: TDef): IR.TDef = t match
     case TDef(ps, rt) => IR.TDef(ps.map(go), go(rt))

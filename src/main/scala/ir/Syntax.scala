@@ -28,9 +28,9 @@ object Syntax:
     case Lam(name: Int, t1: Ty, t2: TDef, body: Tm)
     case App(fn: Tm, arg: Tm)
 
-    case Pair(fst: Tm, snd: Tm)
-    case Fst(tm: Tm)
-    case Snd(tm: Tm)
+    case Pair(t1: Ty, t2: Ty, fst: Tm, snd: Tm)
+    case Fst(ty: Ty, tm: Tm)
+    case Snd(ty: Ty, tm: Tm)
 
     case Z
     case S(n: Tm)
@@ -45,9 +45,9 @@ object Syntax:
       case Lam(x, _, _, b) => s"(\\'$x. $b)"
       case App(f, a)       => s"($f $a)"
 
-      case Pair(fst, snd) => s"($fst, $snd)"
-      case Fst(t)         => s"(fst $t)"
-      case Snd(t)         => s"(snd $t)"
+      case Pair(_, _, fst, snd) => s"($fst, $snd)"
+      case Fst(_, t)            => s"(fst $t)"
+      case Snd(_, t)            => s"(snd $t)"
 
       case Z          => "Z"
       case S(n)       => s"(S $n)"
@@ -82,9 +82,9 @@ object Syntax:
       case Lam(x, _, _, b) => b.freeVars.filterNot((y, _) => x == y)
       case App(f, a)       => f.freeVars ++ a.freeVars
 
-      case Pair(fst, snd) => fst.freeVars ++ snd.freeVars
-      case Fst(t)         => t.freeVars
-      case Snd(t)         => t.freeVars
+      case Pair(_, _, fst, snd) => fst.freeVars ++ snd.freeVars
+      case Fst(_, t)            => t.freeVars
+      case Snd(_, t)            => t.freeVars
 
       case S(n) => n.freeVars
 
@@ -113,9 +113,10 @@ object Syntax:
         Lam(y, t1, t2, b.subst(sub + (x -> Local(y, TDef(t1))), scope + y))
       case App(f, a) => App(f.subst(sub, scope), a.subst(sub, scope))
 
-      case Pair(fst, snd) => Pair(fst.subst(sub, scope), snd.subst(sub, scope))
-      case Fst(tm)        => Fst(tm.subst(sub, scope))
-      case Snd(tm)        => Snd(tm.subst(sub, scope))
+      case Pair(t1, t2, fst, snd) =>
+        Pair(t1, t2, fst.subst(sub, scope), snd.subst(sub, scope))
+      case Fst(ty, tm) => Fst(ty, tm.subst(sub, scope))
+      case Snd(ty, tm) => Snd(ty, tm.subst(sub, scope))
 
       case S(n: Tm) => S(n.subst(sub, scope))
       case _        => this
