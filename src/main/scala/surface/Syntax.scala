@@ -3,6 +3,17 @@ package surface
 import common.Common.*
 
 object Syntax:
+  enum ProjType:
+    case Fst
+    case Snd
+    case Named(name: Name)
+
+    override def toString: String = this match
+      case Fst      => ".1"
+      case Snd      => ".2"
+      case Named(x) => s".$x"
+  export ProjType.*
+
   type Ty = Tm
   enum Tm:
     case Var(name: Name)
@@ -13,6 +24,7 @@ object Syntax:
     case App(fn: Tm, arg: Tm, icit: Icit)
 
     case Sigma(name: Bind, ty: Ty, body: Ty)
+    case Proj(tm: Tm, proj: ProjType)
     case Pair(fst: Tm, snd: Tm)
 
     case Lift(tm: Ty)
@@ -54,6 +66,7 @@ object Syntax:
 
       case Sigma(DontBind, t, b)  => s"($t ** $b)"
       case Sigma(DoBind(x), t, b) => s"(($x : $t) ** $b)"
+      case Proj(tm, proj)         => s"$tm$proj"
       case Pair(fst, snd)         => s"($fst, $snd)"
 
       case Hole(Some(x)) => s"_$x"
@@ -78,9 +91,10 @@ object Syntax:
       case Splice(t) => Splice(t.removePos)
 
       case Sigma(x, t, b) => Sigma(x, t.removePos, b.removePos)
+      case Proj(t, p)     => Proj(t.removePos, p)
       case Pair(fst, snd) => Pair(fst.removePos, snd.removePos)
 
-      case Pos(_, t) => t
+      case Pos(_, t) => t.removePos
 
       case _ => this
   export Tm.*

@@ -1,7 +1,7 @@
 package core
 
 import common.Common.*
-import Syntax.Tm
+import Syntax.{Tm, ProjType}
 
 object Value:
   type Env = List[Val]
@@ -18,8 +18,7 @@ object Value:
     case SApp(spine: Spine, arg: Val, icit: Icit)
     case SSplice(spine: Spine)
     case SFoldNat(spine: Spine, ty: VTy, z: Val, s: Val)
-    case SFst(spine: Spine)
-    case SSnd(spine: Spine)
+    case SProj(spine: Spine, proj: ProjType)
   export Spine.*
 
   enum Head:

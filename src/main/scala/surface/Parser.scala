@@ -38,7 +38,8 @@ object Parser:
         "**",
         "^",
         "`",
-        "$"
+        "$",
+        "_"
       ),
       identStart = Predicate(_.isLetter),
       identLetter =
@@ -90,12 +91,17 @@ object Parser:
       ("^" *> atom).map(t => Lift(t)) <|>
         ("`" *> atom).map(t => Quote(t)) <|>
         ("$" *> atom).map(t => Splice(t)) <|>
-        attempt("(" *> tm <~> "," *> tm <* ")").map(Pair.apply) <|>
-        ("(" *> (userOp.map(Var.apply) <|> tm) <* ")") <|>
+        ("(" *> (userOp
+          .map(Var.apply) <|> sepEndBy(tm, ",").map(mkPair)) <* ")") <|>
         holeP <|>
         nat <|>
         ident.map(Var.apply)
     )
+
+    private val unittype = Var(Name("UnitType"))
+    private def mkPair(ts: List[Tm]): Tm = ts match
+      case Nil => unittype
+      case ts  => ts.reduceRight(Pair.apply)
 
     private val hole = Hole(None)
 
@@ -184,7 +190,7 @@ object Parser:
       )
 
     private lazy val appAtom: Parsley[Tm] = positioned(
-      (atom <~> many(arg) <~> option(let <|> lam))
+      (projAtom <~> many(arg) <~> option(let <|> lam))
         .map { case ((fn, args), opt) =>
           (args ++ opt.map(t => (t, Expl))).foldLeft(fn) {
             case (fn, (arg, i)) =>
@@ -195,7 +201,14 @@ object Parser:
 
     private lazy val arg: Parsley[(Tm, Icit)] =
       ("{" *> tm <* "}").map(t => (t, Impl)) <|>
-        atom.map(t => (t, Expl))
+        projAtom.map(t => (t, Expl))
+
+    private lazy val projAtom: Parsley[Tm] = positioned(
+      (atom <~> many(proj)).map((t, ps) => ps.foldLeft(t)(Proj.apply))
+    )
+
+    private lazy val proj: Parsley[ProjType] =
+      ("." *> ("1" #> Fst <|> "2" #> Snd <|> identOrOp.map(Named.apply)))
 
     private def userOpStart(s: String): Parsley[String] =
       userOp0.filter(_.startsWith(s))

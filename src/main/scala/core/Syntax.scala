@@ -3,6 +3,18 @@ package core
 import common.Common.*
 
 object Syntax:
+  enum ProjType:
+    case Fst
+    case Snd
+    case Named(name: Option[Name], ix: Int)
+
+    override def toString: String = this match
+      case Fst               => ".1"
+      case Snd               => ".2"
+      case Named(Some(x), _) => s".$x"
+      case Named(None, i)    => s".$i"
+  export ProjType.*
+
   type Ty = Tm
   enum Tm:
     case Local(ix: Ix)
@@ -20,9 +32,8 @@ object Syntax:
     case App(fn: Tm, arg: Tm, icit: Icit)
 
     case Sigma(name: Bind, ty: Ty, u1: Ty, body: Ty, u2: Ty)
+    case Proj(tm: Tm, proj: ProjType)
     case Pair(fst: Tm, snd: Tm)
-    case Fst(tm: Tm)
-    case Snd(tm: Tm)
 
     case Lift(vf: Ty, tm: Ty)
     case Quote(tm: Tm)
@@ -67,8 +78,7 @@ object Syntax:
       case Sigma(DontBind, t, u1, b, u2)  => s"($t **{$u1}{$u2} $b)"
       case Sigma(DoBind(x), t, u1, b, u2) => s"(($x : $t) **{$u1}{$u2} $b)"
       case Pair(fst, snd)                 => s"($fst, $snd)"
-      case Fst(t)                         => s"(fst $t)"
-      case Snd(t)                         => s"(snd $t)"
+      case Proj(tm, proj)                 => s"$tm$proj"
 
       case Lift(_, t) => s"^$t"
       case Quote(t)   => s"`$t"

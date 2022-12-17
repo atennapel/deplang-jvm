@@ -1,4 +1,4 @@
-add : (Nat ** Nat) -> Nat := \p. foldNat (fst p) (snd p) (\_ r. S r);
+add : (Nat ** Nat) -> Nat := \p. foldNat p.1 p.2 (\_ r. S r);
 (+) : Nat -> Nat -> Nat = \a b. add (a, b);
 
 inc : Nat -> Nat := (+) 1;

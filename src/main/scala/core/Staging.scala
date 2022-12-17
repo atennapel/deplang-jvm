@@ -62,13 +62,14 @@ object Staging:
     case VU0      => VU0app(a)
     case _        => impossible()
 
-  private def vfst1(p: Val1): Val1 = p match
-    case VPair1(fst, _) => fst
-    case _              => impossible()
-
-  private def vsnd1(p: Val1): Val1 = p match
-    case VPair1(_, snd) => snd
-    case _              => impossible()
+  private def vproj1(tm: Val1, proj: ProjType): Val1 = tm match
+    case VPair1(fst, snd) =>
+      proj match
+        case Fst         => fst
+        case Snd         => snd
+        case Named(_, 0) => fst
+        case Named(x, i) => vproj1(snd, Named(x, i - 1))
+    case _ => impossible()
 
   private def eval1Bind(t: Tm, u: Val1)(implicit env: Env): Val1 =
     eval1(t)(Def1(env, u))
@@ -87,8 +88,7 @@ object Staging:
 
     case Sigma(_, a, _, b, _) => VPairTy1(eval1(a), eval1(b))
     case Pair(fst, snd)       => VPair1(eval1(fst), eval1(snd))
-    case Fst(t)               => vfst1(eval1(t))
-    case Snd(t)               => vsnd1(eval1(t))
+    case Proj(t, p)           => vproj1(eval1(t), p)
 
     case Pi(x, _, a, _, b, u) => VFun1(eval1(a), eval1(u), eval1(b))
     case Lam(x, _, b)         => VLam1(v => eval1Bind(b, v))
@@ -117,6 +117,12 @@ object Staging:
   private def eval0Bind(t: Tm, u: Val0)(implicit env: Env): Val0 =
     eval0(t)(Def0(env, u))
 
+  private def proj0(v: Val0, p: ProjType): Val0 = p match
+    case Fst         => VFst0(v)
+    case Snd         => VSnd0(v)
+    case Named(_, 0) => VFst0(v)
+    case Named(x, n) => proj0(VSnd0(v), Named(x, n - 1))
+
   private def eval0(t: Tm)(implicit env: Env): Val0 = t match
     case Local(ix)           => vvar0(ix)
     case Global(x)           => VGlobal0(x)
@@ -128,8 +134,7 @@ object Staging:
     case App(f, a, _) => VApp0(eval0(f), eval0(a))
 
     case Pair(fst, snd) => VPair0(eval0(fst), eval0(snd))
-    case Fst(t)         => VFst0(eval0(t))
-    case Snd(t)         => VSnd0(eval0(t))
+    case Proj(t, p)     => proj0(eval0(t), p)
 
     case Splice(t) => vsplice(eval1(t))
 

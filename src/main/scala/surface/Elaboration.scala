@@ -12,6 +12,8 @@ import core.Zonking.*
 import Ctx.*
 import Syntax as S
 
+import scala.annotation.tailrec
+
 object Elaboration:
   final case class ElaborateError(msg: String) extends Exception(msg)
 
@@ -151,11 +153,11 @@ object Elaboration:
                 case None => Some(Lam(pick(x1, x2), i1, App(Wk(t), coev0, i1)))
                 case Some(body) => Some(Lam(pick(x1, x2), i1, body))
         case (VSigma(x1, a1, u11, b1, u12), VSigma(x2, a2, u21, b2, u22)) =>
-          val fst = go(Fst(t), a1, u11, a2, u21)
+          val fst = go(Proj(t, Fst), a1, u11, a2, u21)
           val snd = fst match
             case None =>
               go(
-                Snd(t),
+                Proj(t, Snd),
                 b1(vfst(ctx.eval(t))),
                 u12,
                 b2(vfst(ctx.eval(t))),
@@ -163,7 +165,7 @@ object Elaboration:
               )
             case Some(fst) =>
               go(
-                Snd(t),
+                Proj(t, Snd),
                 b1(vfst(ctx.eval(t))),
                 u12,
                 b2(ctx.eval(fst)),
@@ -171,8 +173,8 @@ object Elaboration:
               )
           (fst, snd) match
             case (None, None)           => None
-            case (Some(fst), None)      => Some(Pair(fst, Snd(t)))
-            case (None, Some(snd))      => Some(Pair(Fst(t), snd))
+            case (Some(fst), None)      => Some(Pair(fst, Proj(t, Snd)))
+            case (None, Some(snd))      => Some(Pair(Proj(t, Fst), snd))
             case (Some(fst), Some(snd)) => Some(Pair(fst, snd))
         case (VU(vf), VU1) => Some(Lift(ctx.quote(vf), t))
         case (VLift(r1, a), VLift(r2, b)) =>
@@ -242,6 +244,34 @@ object Elaboration:
         )
         coe(etm, ty2, univ2, ty, univ)
 
+  private def projIndex(tm: Val, x: Bind, ix: Int, clash: Boolean): Val =
+    x match
+      case DoBind(x) if !clash => vproj(tm, Named(Some(x), ix))
+      case _ =>
+        @tailrec
+        def go(tm: Val, ix: Int): Val = ix match
+          case 0 => vproj(tm, Fst)
+          case n => go(vproj(tm, Snd), n - 1)
+        go(tm, ix)
+  private def projNamed(tm: Val, ty: VTy, x: Name)(implicit
+      ctx: Ctx
+  ): (ProjType, VTy, VTy) =
+    @tailrec
+    def go(ty: VTy, ix: Int, ns: Set[Name]): (ProjType, VTy, VTy) =
+      force(ty) match
+        case VSigma(DoBind(y), fstty, u1, _, _) if x == y =>
+          (Named(Some(x), ix), fstty, u1)
+        case VSigma(y, _, _, sndty, _) =>
+          val (clash, newns) = y match
+            case DoBind(y) => (ns.contains(y), ns + y)
+            case DontBind  => (false, ns)
+          go(sndty(projIndex(tm, y, ix, clash)), ix + 1, newns)
+        case _ =>
+          throw ElaborateError(
+            s"expected sigma in named projection $x, got ${ctx.pretty(ty)}"
+          )
+    go(ty, 0, Set.empty)
+
   private def infer(tm: S.Tm, univ: VTy)(implicit ctx: Ctx): (Tm, VTy) =
     if !tm.isPos then debug(s"inferS $tm : ${ctx.pretty(univ)}")
     tm match
@@ -262,17 +292,6 @@ object Elaboration:
       case S.Var(Name("Fun")) => (VFFun, VVF, VU1)
       case S.Var(Name("U1"))  => (U1, VU1, VU1)
       case S.Var(Name("U0"))  => (U0, vpi("_", VVF, VU1, VU1, _ => VU1), VU1)
-      case S.App(S.Var(Name("fst")), t, Expl) =>
-        val (et, vt, st) = insertPi(infer(t))
-        force(vt) match
-          case VSigma(_, fst, u1, snd, u2) => (Fst(et), fst, u1)
-          case _ => throw ElaborateError(s"expected sigma type in $tm")
-      case S.App(S.Var(Name("snd")), t, Expl) =>
-        val (et, vt, st) = insertPi(infer(t))
-        force(vt) match
-          case VSigma(_, fst, u1, snd, u2) =>
-            (Snd(et), snd(ctx.eval(Fst(et))), u2)
-          case _ => throw ElaborateError(s"expected sigma type in $tm")
       case S.Var(Name("Nat")) => (Nat, VUVal(), VU1)
       case S.Var(Name("Z"))   => (Z, VNat, VUVal())
       case S.App(S.Var(Name("S")), n, Expl) =>
@@ -377,6 +396,19 @@ object Elaboration:
           case _ =>
             throw ElaborateError(
               s"pi expected in $tm but got: ${ctx.pretty(fty)}"
+            )
+      case S.Proj(t, p) =>
+        val (et, ty, l1) = insertPi(infer(t))
+        (force(ty), p) match
+          case (_, S.Named(x)) =>
+            val (p, pty, lv) = projNamed(ctx.eval(et), ty, x)
+            (Proj(et, p), pty, lv)
+          case (VSigma(_, fstty, u1, _, _), S.Fst) => (Proj(et, Fst), fstty, u1)
+          case (VSigma(_, _, _, sndty, u2), S.Snd) =>
+            (Proj(et, Snd), sndty(vproj(ctx.eval(et), Fst)), u2)
+          case _ =>
+            throw ElaborateError(
+              s"sigma expected in $tm but got: ${ctx.pretty(ty)}"
             )
       case S.Lift(t) =>
         val (et, st, _) = inferType(t)

@@ -42,27 +42,28 @@ object Evaluation:
       VGlobal(x, SFoldNat(sp, t, z, s), () => vfoldnat(t, v(), z, s))
     case _ => impossible()
 
-  def vfst(v: Val): Val = v match
-    case VPair(fst, snd)   => fst
-    case VRigid(hd, sp)    => VRigid(hd, SFst(sp))
-    case VFlex(hd, sp)     => VFlex(hd, SFst(sp))
-    case VGlobal(x, sp, v) => VGlobal(x, SFst(sp), () => vfst(v()))
-    case _                 => impossible()
+  def vproj(tm: Val, proj: ProjType): Val = tm match
+    case VPair(fst, snd) =>
+      proj match
+        case Fst         => fst
+        case Snd         => snd
+        case Named(_, 0) => fst
+        case Named(x, i) => vproj(snd, Named(x, i - 1))
+    case VRigid(hd, sp) => VRigid(hd, SProj(sp, proj))
+    case VFlex(hd, sp)  => VFlex(hd, SProj(sp, proj))
+    case VGlobal(x, sp, v) =>
+      VGlobal(x, SProj(sp, proj), () => vproj(v(), proj))
+    case _ => impossible()
 
-  def vsnd(v: Val): Val = v match
-    case VPair(fst, snd)   => snd
-    case VRigid(hd, sp)    => VRigid(hd, SSnd(sp))
-    case VFlex(hd, sp)     => VFlex(hd, SSnd(sp))
-    case VGlobal(x, sp, v) => VGlobal(x, SSnd(sp), () => vsnd(v()))
-    case _                 => impossible()
+  def vfst(v: Val): Val = vproj(v, Fst)
+  def vsnd(v: Val): Val = vproj(v, Snd)
 
   def vspine(v: Val, sp: Spine): Val = sp match
     case SId                   => v
     case SApp(sp, a, i)        => vapp(vspine(v, sp), a, i)
     case SSplice(sp)           => vsplice(vspine(v, sp))
     case SFoldNat(sp, t, z, s) => vfoldnat(t, vspine(v, sp), z, s)
-    case SFst(sp)              => vfst(vspine(v, sp))
-    case SSnd(sp)              => vsnd(vspine(v, sp))
+    case SProj(sp, p)          => vproj(vspine(v, sp), p)
 
   def vmeta(id: MetaId): Val = getMeta(id) match
     case Unsolved     => VMeta(id)
@@ -98,8 +99,7 @@ object Evaluation:
     case Sigma(x, t, u1, b, u2) =>
       VSigma(x, eval(t), eval(u1), Clos(b), eval(u2))
     case Pair(fst, snd) => VPair(eval(fst), eval(snd))
-    case Fst(t)         => vfst(eval(t))
-    case Snd(t)         => vsnd(eval(t))
+    case Proj(t, p)     => vproj(eval(t), p)
 
     case Lift(vf, t) => VLift(eval(vf), eval(t))
     case Quote(t)    => vquote(eval(t))
@@ -145,8 +145,7 @@ object Evaluation:
           quote(s, unfold),
           Expl
         )
-      case SFst(sp) => Fst(quote(hd, sp, unfold))
-      case SSnd(sp) => Snd(quote(hd, sp, unfold))
+      case SProj(sp, p) => Proj(quote(hd, sp, unfold), p)
 
   private def quote(b: Clos, unfold: Unfold)(implicit k: Lvl): Tm =
     quote(b(VVar(k)), unfold)(k + 1)

@@ -71,12 +71,15 @@ object Pretty:
     case Z                   => pretty(tm)
     case FoldNat(t) if app   => pretty(tm)
     case Pair(_, _)          => pretty(tm)
-    case Fst(_)              => pretty(tm)
-    case Snd(_)              => pretty(tm)
+    case Proj(_, _)          => pretty(tm)
     case Meta(_)             => pretty(tm)
     case InsertedMeta(_, _)  => pretty(tm)
     case Wk(t)               => prettyParen(t, app)(ns.tail)
     case _                   => s"(${pretty(tm)})"
+
+  private def flattenPair(tm: Tm): List[Tm] = tm match
+    case Pair(fst, snd) => fst :: flattenPair(snd)
+    case tm             => List(tm)
 
   def pretty(tm: Tm)(implicit ns: List[Name]): String = tm match
     case Local(ix) => s"${ns(ix.expose)}"
@@ -101,9 +104,10 @@ object Pretty:
     case App(_, _, _)         => prettyApp(tm)
 
     case Sigma(_, _, _, _, _) => prettySigma(tm)
-    case Pair(fst, snd)       => s"($fst, $snd)"
-    case Fst(t)               => s"(fst $t)"
-    case Snd(t)               => s"(snd $t)"
+    case Proj(tm, proj)       => s"${prettyParen(tm)}$proj"
+    case Pair(_, _) =>
+      val es = flattenPair(tm)
+      s"(${es.map(pretty).mkString(", ")})"
 
     case Lift(_, t) => s"^${prettyParen(t)}"
     case Quote(t)   => s"`${prettyParen(t)}"
