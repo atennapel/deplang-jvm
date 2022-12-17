@@ -19,6 +19,7 @@ object Value:
     case SSplice(spine: Spine)
     case SFoldNat(spine: Spine, ty: VTy, z: Val, s: Val)
     case SProj(spine: Spine, proj: ProjType)
+    case SIf(spine: Spine, ty: VTy, ifTrue: Val, ifFalse: Val)
   export Spine.*
 
   enum Head:
@@ -49,6 +50,10 @@ object Value:
     case VNat
     case VZ
     case VS(n: VTy)
+
+    case VBool
+    case VTrue
+    case VFalse
   export Val.*
 
   private def name(x: String): Bind =

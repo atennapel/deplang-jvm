@@ -69,6 +69,9 @@ object Pretty:
     case Splice(_)           => pretty(tm)
     case Nat                 => pretty(tm)
     case Z                   => pretty(tm)
+    case Bool                => pretty(tm)
+    case True                => pretty(tm)
+    case False               => pretty(tm)
     case FoldNat(t) if app   => pretty(tm)
     case Pair(_, _)          => pretty(tm)
     case Proj(_, _)          => pretty(tm)
@@ -119,6 +122,12 @@ object Pretty:
     case Z          => prettyNat(tm)
     case S(_)       => prettyNat(tm)
     case FoldNat(t) => s"foldNat {${pretty(t)}}"
+
+    case Bool  => "Bool"
+    case True  => "True"
+    case False => "False"
+    case If(_, c, a, b) =>
+      s"if ${pretty(c)} then ${pretty(a)} else ${pretty(b)}"
 
     case Meta(id)            => s"?$id"
     case InsertedMeta(id, _) => s"?$id"

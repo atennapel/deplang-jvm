@@ -5,10 +5,12 @@ import common.Common.*
 object Syntax:
   enum Ty:
     case TNat
+    case TBool
     case TPair(fst: Ty, snd: Ty)
 
     override def toString: String = this match
       case TNat            => "Nat"
+      case TBool           => "Bool"
       case TPair(fst, snd) => s"($fst ** $snd)"
   export Ty.*
 
@@ -36,6 +38,10 @@ object Syntax:
     case S(n: Tm)
     case FoldNat(ty: Ty)
 
+    case True
+    case False
+    case If(ty: Ty, cond: Tm, ifTrue: Tm, ifFalse: Tm)
+
     override def toString: String = this match
       case Local(x, _)  => s"'$x"
       case Global(x, _) => s"$x"
@@ -52,6 +58,10 @@ object Syntax:
       case Z          => "Z"
       case S(n)       => s"(S $n)"
       case FoldNat(t) => s"(foldNat {$t})"
+
+      case True           => "True"
+      case False          => "False"
+      case If(_, c, a, b) => s"(if $c then $a else $b)"
 
     def flattenLams: (List[(Int, Ty)], Option[Ty], Tm) =
       def go(t: Tm): (List[(Int, Ty)], Option[Ty], Tm) = t match
@@ -88,6 +98,8 @@ object Syntax:
 
       case S(n) => n.freeVars
 
+      case If(_, c, a, b) => c.freeVars ++ a.freeVars ++ b.freeVars
+
       case _ => Nil
 
     def subst(sub: Map[Int, Tm]): Tm =
@@ -119,7 +131,11 @@ object Syntax:
       case Snd(ty, tm) => Snd(ty, tm.subst(sub, scope))
 
       case S(n: Tm) => S(n.subst(sub, scope))
-      case _        => this
+
+      case If(t, c, a, b) =>
+        If(t, c.subst(sub, scope), a.subst(sub, scope), b.subst(sub, scope))
+
+      case _ => this
 
     def toInt: Option[Int] = this match
       case Z    => Some(0)

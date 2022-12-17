@@ -65,6 +65,19 @@ object Simplifier:
     case S(n)       => go(n).map(S.apply)
     case FoldNat(t) => None
 
+    case True  => None
+    case False => None
+
+    case If(t, True, a, b)  => Some(a)
+    case If(t, False, a, b) => Some(b)
+    case If(t, c, a, b) =>
+      go(c) match
+        case Some(c) =>
+          go2(a, b) match
+            case Some((a, b)) => Some(If(t, c, a, b))
+            case None         => Some(If(t, c, a, b))
+        case None => go2(a, b).map(If(t, c, _, _))
+
   private def go2(a: Tm, b: Tm)(implicit scope: Set[Int]): Option[(Tm, Tm)] =
     (go(a), go(b)) match
       case (None, None)       => None

@@ -237,6 +237,15 @@ object Elaboration:
         val eb = check(b, ty, univ)(ctx.define(x, vt, univ, ctx.eval(ev)))
         Let(x, ctx.quote(univ), et, ev, eb)
 
+      case (S.If(c, t, f), _) =>
+        val ec = check(c, VBool, VUVal())
+        val et = check(t, ty, univ)
+        val ef = check(f, ty, univ)
+        force(univ) match
+          case VUVal() =>
+          case _ => throw ElaborateError(s"if should return in U0 Val: $tm")
+        If(ctx.quote(ty), ec, et, ef)
+
       case (tm, _) =>
         val (etm, ty2, univ2) = insert(infer(tm))
         debug(
@@ -286,14 +295,17 @@ object Elaboration:
   private def infer(tm: S.Tm)(implicit ctx: Ctx): (Tm, VTy, VTy) =
     if !tm.isPos then debug(s"infer $tm")
     tm.removePos match
-      case S.Pos(pos, tm)     => infer(tm)(ctx.enter(pos))
-      case S.Var(Name("VF"))  => (VF, VU1, VU1)
-      case S.Var(Name("Val")) => (VFVal, VVF, VU1)
-      case S.Var(Name("Fun")) => (VFFun, VVF, VU1)
-      case S.Var(Name("U1"))  => (U1, VU1, VU1)
-      case S.Var(Name("U0"))  => (U0, vpi("_", VVF, VU1, VU1, _ => VU1), VU1)
-      case S.Var(Name("Nat")) => (Nat, VUVal(), VU1)
-      case S.Var(Name("Z"))   => (Z, VNat, VUVal())
+      case S.Pos(pos, tm)       => infer(tm)(ctx.enter(pos))
+      case S.Var(Name("VF"))    => (VF, VU1, VU1)
+      case S.Var(Name("Val"))   => (VFVal, VVF, VU1)
+      case S.Var(Name("Fun"))   => (VFFun, VVF, VU1)
+      case S.Var(Name("U1"))    => (U1, VU1, VU1)
+      case S.Var(Name("U0"))    => (U0, vpi("_", VVF, VU1, VU1, _ => VU1), VU1)
+      case S.Var(Name("Bool"))  => (Bool, VUVal(), VU1)
+      case S.Var(Name("True"))  => (True, VBool, VUVal())
+      case S.Var(Name("False")) => (False, VBool, VUVal())
+      case S.Var(Name("Nat"))   => (Nat, VUVal(), VU1)
+      case S.Var(Name("Z"))     => (Z, VNat, VUVal())
       case S.App(S.Var(Name("S")), n, Expl) =>
         val en = check(n, VNat, VUVal())
         (NatS(en), VNat, VUVal())
@@ -443,6 +455,11 @@ object Elaboration:
               s"invalid universe in snd of pair: ${ctx.pretty(u)}"
             )
         (Pair(efst, esnd), VSigma(DontBind, t1, u1, CFun(_ => t2), u2), u2)
+      case S.If(c, t, f) =>
+        val ec = check(c, VBool, VUVal())
+        val (et, vty) = infer(t, VUVal())
+        val ef = check(f, vty, VUVal())
+        (If(ctx.quote(vty), ec, et, ef), vty, VUVal())
       case S.Hole(_) =>
         val u = ctx.eval(newMeta())
         val ty = ctx.eval(newMeta())

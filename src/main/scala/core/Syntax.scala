@@ -46,6 +46,11 @@ object Syntax:
     case S(n: Tm)
     case FoldNat(ty: Ty)
 
+    case Bool
+    case True
+    case False
+    case If(ty: Ty, cond: Tm, ifTrue: Tm, ifFalse: Tm)
+
     case Meta(id: MetaId)
     case InsertedMeta(id: MetaId, bds: BDs)
 
@@ -90,6 +95,11 @@ object Syntax:
       case Z          => "Z"
       case S(n)       => s"(S $n)"
       case FoldNat(t) => s"(foldNat {$t})"
+
+      case Bool           => "Bool"
+      case True           => "True"
+      case False          => "False"
+      case If(_, c, a, b) => s"(if $c then $a else $b)"
 
       case Meta(id)            => s"?$id"
       case InsertedMeta(id, _) => s"?$id"

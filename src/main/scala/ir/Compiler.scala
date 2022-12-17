@@ -87,18 +87,33 @@ object Compiler:
       case Z    => IR.Z
       case S(n) => IR.S(go(n))
 
+      case True           => IR.True
+      case False          => IR.False
+      case If(t, c, a, b) => IR.If(go(t), go(c), go(a), go(b))
+
       case _ => impossible()
 
   private def box(ty: Ty, tm: IR.Tm): IR.Tm = ty match
-    case TNat => IR.Box(go(ty), tm)
-    case _    => tm
+    case TPair(_, _) => tm
+    case _ =>
+      val ct = go(ty)
+      tm match
+        case IR.Unbox(_, tm) => tm
+        case IR.Box(_, tm)   => tm
+        case _               => IR.Box(ct, tm)
 
   private def unbox(ty: Ty, tm: IR.Tm): IR.Tm = ty match
-    case TNat => IR.Unbox(go(ty), tm)
-    case _    => tm
+    case TPair(_, _) => tm
+    case _ =>
+      val ct = go(ty)
+      tm match
+        case IR.Unbox(_, tm) => tm
+        case IR.Box(_, tm)   => tm
+        case _               => IR.Unbox(ct, tm)
 
   private def go(t: Ty): IR.Ty = t match
     case TNat        => IR.TNat
+    case TBool       => IR.TBool
     case TPair(_, _) => IR.TPair
 
   private def go(t: TDef): IR.TDef = t match

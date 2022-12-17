@@ -5,10 +5,12 @@ import common.Common.*
 object Syntax:
   enum Ty:
     case TNat
+    case TBool
     case TPair
 
     override def toString: String = this match
       case TNat  => "Nat"
+      case TBool => "Bool"
       case TPair => s"Pair"
   export Ty.*
 
@@ -33,6 +35,10 @@ object Syntax:
     case S(n: Tm)
     case FoldNat(ty: Ty, n: Tm, z: Tm, x1: Int, x2: Int, s: Tm)
 
+    case True
+    case False
+    case If(ty: Ty, cond: Tm, ifTrue: Tm, ifFalse: Tm)
+
     case Box(ty: Ty, tm: Tm)
     case Unbox(ty: Ty, tm: Tm)
 
@@ -52,6 +58,10 @@ object Syntax:
       case S(n) => s"(S $n)"
       case FoldNat(t, n, z, x1, x2, s) =>
         s"(foldNat {$t} $n $z ('$x1 '$x2. $s))"
+
+      case True           => "True"
+      case False          => "False"
+      case If(_, c, a, b) => s"(if $c then $a else $b)"
 
       case Box(ty, tm)   => s"(box {$ty} $tm)"
       case Unbox(ty, tm) => s"(unbox {$ty} $tm)"

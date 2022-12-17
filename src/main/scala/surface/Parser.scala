@@ -24,7 +24,10 @@ object Parser:
       nestedComments = true,
       keywords = Set(
         "let",
-        "in"
+        "in",
+        "if",
+        "then",
+        "else"
       ),
       operators = Set(
         "=",
@@ -114,7 +117,7 @@ object Parser:
     )
 
     lazy val tm: Parsley[Tm] = positioned(
-      attempt(piSigma) <|> let <|> lam <|>
+      attempt(piSigma) <|> ifP <|> let <|> lam <|>
         precedence[Tm](app)(
           Ops(InfixR)("**" #> ((l, r) => Sigma(DontBind, l, r))),
           Ops(InfixR)("->" #> ((l, r) => Pi(DontBind, Expl, l, r)))
@@ -160,6 +163,10 @@ object Parser:
             Let(x, univ, ty, v, b)
           }
       )
+
+    private lazy val ifP: Parsley[Tm] =
+      ("if" *> tm <~> "then" *> tm <~> "else" *> tm)
+        .map { case ((c, t), f) => If(c, t, f) }
 
     private lazy val lam: Parsley[Tm] =
       positioned(

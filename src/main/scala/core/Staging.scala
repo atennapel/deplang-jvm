@@ -30,6 +30,7 @@ object Staging:
     case VU0
     case VU0app(arg: Val1)
     case VNat1
+    case VBool1
     case VFun1(left: Val1, vf: Val1, right: Val1)
     case VPairTy1(fst: Val1, snd: Val1)
     case VPair1(fst: Val1, snd: Val1)
@@ -47,6 +48,9 @@ object Staging:
     case VZ0
     case VS0(n: Val0)
     case VFoldNat0(ty: Val1)
+    case VTrue0
+    case VFalse0
+    case VIf0(ty: Val1, cond: Val0, ifTrue: Val0, ifFalse: Val0)
   import Val0.*
 
   private def vvar1(ix: Ix)(implicit env: Env): Val1 =
@@ -84,7 +88,8 @@ object Staging:
     case U0    => VU0
     case U1    => VU1
 
-    case Nat => VNat1
+    case Nat  => VNat1
+    case Bool => VBool1
 
     case Sigma(_, a, _, b, _) => VPairTy1(eval1(a), eval1(b))
     case Pair(fst, snd)       => VPair1(eval1(fst), eval1(snd))
@@ -144,6 +149,10 @@ object Staging:
     case S(n)       => VS0(eval0(n))
     case FoldNat(t) => VFoldNat0(eval1(t))
 
+    case True           => VTrue0
+    case False          => VFalse0
+    case If(t, c, a, b) => VIf0(eval1(t), eval0(c), eval0(a), eval0(b))
+
     case _ => impossible()
 
   // staging
@@ -162,6 +171,10 @@ object Staging:
     case Z
     case S(n: Tmp)
     case FoldNat(ty: IR.Ty)
+
+    case True
+    case False
+    case If(ty: IR.Ty, cond: Tmp, ifTrue: Tmp, ifFalse: Tmp)
 
   private def quote0ir(v: Val0)(implicit k: Lvl): Tmp = v match
     case VVar0(l)    => Tmp.Local(l.toIx)
@@ -183,10 +196,15 @@ object Staging:
     case VPair0(fst, snd) => Tmp.Pair(quote0ir(fst), quote0ir(snd))
     case VFst0(t)         => Tmp.Fst(quote0ir(t))
     case VSnd0(t)         => Tmp.Snd(quote0ir(t))
-    case _                => impossible()
+    case VTrue0           => Tmp.True
+    case VFalse0          => Tmp.False
+    case VIf0(t, c, a, b) =>
+      Tmp.If(quote1ty(t), quote0ir(c), quote0ir(a), quote0ir(b))
+    case _ => impossible()
 
   private def quote1ty(v: Val1)(implicit k: Lvl): IR.Ty = v match
     case VNat1              => IR.TNat
+    case VBool1             => IR.TBool
     case VPairTy1(fst, snd) => IR.TPair(quote1ty(fst), quote1ty(snd))
     case _                  => impossible()
 
@@ -302,6 +320,14 @@ object Staging:
     case Tmp.S(n) =>
       val en = check(n, IR.TNat)
       (IR.S(en), IR.TDef(IR.TNat))
+
+    case Tmp.True  => (IR.True, IR.TDef(IR.TBool))
+    case Tmp.False => (IR.False, IR.TDef(IR.TBool))
+    case Tmp.If(ty, c, a, b) =>
+      val ec = check(c, IR.TBool)
+      val ea = check(a, ty)
+      val eb = check(b, ty)
+      (IR.If(ty, ec, ea, eb), IR.TDef(ty))
 
     case _ => impossible()
 

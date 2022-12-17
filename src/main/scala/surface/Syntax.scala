@@ -31,6 +31,8 @@ object Syntax:
     case Quote(tm: Tm)
     case Splice(tm: Tm)
 
+    case If(cond: Tm, ifTrue: Tm, ifFalse: Tm)
+
     case Hole(name: Option[Name])
 
     case Pos(pos: PosInfo, tm: Tm)
@@ -69,6 +71,8 @@ object Syntax:
       case Proj(tm, proj)         => s"$tm$proj"
       case Pair(fst, snd)         => s"($fst, $snd)"
 
+      case If(c, a, b) => s"(if $c then $a else $b)"
+
       case Hole(Some(x)) => s"_$x"
       case Hole(None)    => "_"
 
@@ -93,6 +97,8 @@ object Syntax:
       case Sigma(x, t, b) => Sigma(x, t.removePos, b.removePos)
       case Proj(t, p)     => Proj(t.removePos, p)
       case Pair(fst, snd) => Pair(fst.removePos, snd.removePos)
+
+      case If(c, a, b) => If(c.removePos, a.removePos, b.removePos)
 
       case Pos(_, t) => t.removePos
 

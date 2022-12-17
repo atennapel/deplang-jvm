@@ -58,12 +58,22 @@ object Evaluation:
   def vfst(v: Val): Val = vproj(v, Fst)
   def vsnd(v: Val): Val = vproj(v, Snd)
 
+  def vif(c: Val, t: VTy, a: Val, b: Val): Val = c match
+    case VTrue          => a
+    case VFalse         => b
+    case VRigid(hd, sp) => VRigid(hd, SIf(sp, t, a, b))
+    case VFlex(hd, sp)  => VFlex(hd, SIf(sp, t, a, b))
+    case VGlobal(x, sp, v) =>
+      VGlobal(x, SIf(sp, t, a, b), () => vif(v(), t, a, b))
+    case _ => impossible()
+
   def vspine(v: Val, sp: Spine): Val = sp match
     case SId                   => v
     case SApp(sp, a, i)        => vapp(vspine(v, sp), a, i)
     case SSplice(sp)           => vsplice(vspine(v, sp))
     case SFoldNat(sp, t, z, s) => vfoldnat(t, vspine(v, sp), z, s)
     case SProj(sp, p)          => vproj(vspine(v, sp), p)
+    case SIf(sp, t, a, b)      => vif(vspine(v, sp), t, a, b)
 
   def vmeta(id: MetaId): Val = getMeta(id) match
     case Unsolved     => VMeta(id)
@@ -113,6 +123,11 @@ object Evaluation:
     case FoldNat(t) =>
       vlam("n", n => vlam("z", z => vlam("s", s => vfoldnat(eval(t), n, z, s))))
 
+    case Bool           => VBool
+    case True           => VTrue
+    case False          => VFalse
+    case If(t, c, a, b) => vif(eval(c), eval(t), eval(a), eval(b))
+
     case Meta(id)              => vmeta(id)
     case InsertedMeta(id, bds) => vappbds(vmeta(id), bds)
 
@@ -146,6 +161,13 @@ object Evaluation:
           Expl
         )
       case SProj(sp, p) => Proj(quote(hd, sp, unfold), p)
+      case SIf(sp, t, a, b) =>
+        If(
+          quote(t, unfold),
+          quote(hd, sp, unfold),
+          quote(a, unfold),
+          quote(b, unfold)
+        )
 
   private def quote(b: Clos, unfold: Unfold)(implicit k: Lvl): Tm =
     quote(b(VVar(k)), unfold)(k + 1)
@@ -193,5 +215,9 @@ object Evaluation:
       case VNat  => Nat
       case VZ    => Z
       case VS(n) => S(quote(n, unfold))
+
+      case VBool  => Bool
+      case VTrue  => True
+      case VFalse => False
 
   def nf(tm: Tm)(implicit env: Env = Nil): Tm = quote(eval(tm))(mkLvl(env.size))

@@ -39,7 +39,8 @@ object Unification:
           go(s),
           Expl
         )
-      case SProj(sp, p) => Proj(goSp(hd, sp), p)
+      case SProj(sp, p)     => Proj(goSp(hd, sp), p)
+      case SIf(sp, t, a, b) => If(go(t), goSp(hd, sp), go(a), go(b))
 
     def goCl(c: Clos)(implicit pren: PRen): Tm =
       go(c(VVar(pren.cod)))(pren.lift)
@@ -91,6 +92,10 @@ object Unification:
       case VZ    => Z
       case VS(n) => S(go(n))
 
+      case VBool  => Bool
+      case VTrue  => True
+      case VFalse => False
+
     go(v)
 
   private def lams(sp: Spine, b: Tm): Tm =
@@ -126,6 +131,8 @@ object Unification:
     case (SProj(s1, p1), SProj(s2, p2)) if p1 == p2 => unify(s1, s2)
     case (SProj(s1, Fst), SProj(s2, Named(_, n)))   => unifyProj(s1, s2, n)
     case (SProj(s1, Named(_, n)), SProj(s2, Fst))   => unifyProj(s2, s1, n)
+    case (SIf(sp1, t1, a1, b1), SIf(sp2, t2, a2, b2)) =>
+      unify(sp1, sp2); unify(t1, t2); unify(a1, a2); unify(b1, b2)
     case _ => throw UnifyError("spine mismatch")
 
   private def unify(a: Clos, b: Clos)(implicit k: Lvl): Unit =
@@ -141,6 +148,9 @@ object Unification:
       case (VNat, VNat)               => ()
       case (VZ, VZ)                   => ()
       case (VS(n), VS(m))             => unify(n, m)
+      case (VBool, VBool)             => ()
+      case (VTrue, VTrue)             => ()
+      case (VFalse, VFalse)           => ()
       case (VLift(_, a), VLift(_, b)) => unify(a, b)
       case (VQuote(a), VQuote(b))     => unify(a, b)
       case (VPi(_, _, t1, u11, b1, u12), VPi(_, _, t2, u21, b2, u22)) =>

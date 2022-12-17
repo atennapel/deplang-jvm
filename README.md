@@ -37,7 +37,7 @@ TODO:
   - [x] main method
   - [x] Definitions without parameters to static properties
 - [x] Named sigma projection
-- [ ] Bool type with if expression
+- [x] Bool type with if expression
 - [ ] Change Nat to Int and add binops
 - [ ] Top-level recursion and basic tail-recursion
 - [ ] Datatypes

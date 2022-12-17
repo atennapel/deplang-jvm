@@ -79,3 +79,8 @@ object Zonking:
     case Z          => tm
     case S(n)       => S(zonk(n))
     case FoldNat(t) => FoldNat(zonk(t))
+
+    case Bool           => tm
+    case True           => tm
+    case False          => tm
+    case If(t, c, a, b) => If(zonk(t), zonk(c), zonk(a), zonk(b))
