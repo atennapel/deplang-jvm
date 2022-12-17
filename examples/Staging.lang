@@ -14,4 +14,4 @@ pred : Nat -> Nat := \n. fold n Z (\m _. m);
 pow : Nat1 -> Nat -> Nat =
   \n m. foldNat1 n 1 (\n. m * n);
 
-test ::= pow (S1 (S1 Z1)) 3;
+main : Nat -> Nat := \_. pow (S1 (S1 Z1)) 3;

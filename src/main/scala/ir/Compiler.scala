@@ -18,14 +18,15 @@ object Compiler:
   // normalize def name based on jvm limitations
   private def norm(x: Name): Name =
     Name(
-      x.expose
-        .replace(".", "$_DOT_$")
-        .replace(";", "$_SEMICOLON_$")
-        .replace("[", "$_BRACKET_$")
-        .replace("/", "$_SLASH_$")
-        .replace("<", "$_ANGLELEFT_$")
-        .replace(">", "$_ANGLERIGHT_$")
-        .replace(":", "$_COLON_$")
+      (if x.isOperator then "f" else "") +
+        x.expose
+          .replace(".", "$_DOT_$")
+          .replace(";", "$_SEMICOLON_$")
+          .replace("[", "$_BRACKET_$")
+          .replace("/", "$_SLASH_$")
+          .replace("<", "$_ANGLELEFT_$")
+          .replace(">", "$_ANGLERIGHT_$")
+          .replace(":", "$_COLON_$")
     )
 
   private def go(d: Def): List[IR.Def] = d match
@@ -70,7 +71,7 @@ object Compiler:
         f match
           case Global(x, t) =>
             if t.params.size != as.size then impossible()
-            IR.Global(x, go(t), as.map(go))
+            IR.Global(norm(x), go(t), as.map(go))
           case FoldNat(t) =>
             if as.size != 3 then impossible()
             val n = as(0)

@@ -27,6 +27,8 @@ object Generator:
     )
     cw.visit(V1_8, ACC_PUBLIC, moduleName, null, "java/lang/Object", null)
 
+    implicit val ctx: Ctx = Ctx(moduleName, Type.getType(s"L$moduleName;"))
+
     // empty constructor
     val con = cw.visitMethod(ACC_PRIVATE, "<init>", "()V", null, null)
     con.visitVarInsn(ALOAD, 0)
@@ -55,7 +57,11 @@ object Generator:
       "out",
       "Ljava/io/PrintStream;"
     )
-    main.push(42)
+    main.push(0)
+    main.invokeStatic(
+      ctx.moduleType,
+      new Method("main", Type.INT_TYPE, List(Type.INT_TYPE).toArray)
+    )
     main.invokeStatic(
       Type.getType(classOf[Integer]),
       Method.getMethod("Integer valueOf (int)")
@@ -76,7 +82,6 @@ object Generator:
     main.visitEnd
 
     // generate definitions
-    implicit val ctx: Ctx = Ctx(moduleName, Type.getType(s"L$moduleName;"))
     ds.toList.foreach(gen)
 
     // end

@@ -34,7 +34,8 @@ TODO:
   - [x] Primitives
   - [x] Boxing/unboxing
   - [x] foldNat
-  - [ ] main method
+  - [x] main method
+  - [ ] Definitions without parameters to static properties
 - [ ] Named sigma projection
 - [ ] Change Nat to Int and add binops
 - [ ] Bool type with if expression

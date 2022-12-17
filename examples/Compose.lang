@@ -5,3 +5,5 @@
 (*) : Nat -> Nat -> Nat := \a b. foldNat a 0 (\_ r. b + r);
 
 m2a1 : Nat -> Nat := ((+) 1) << ((*) 2);
+
+main : Nat -> Nat := \_. m2a1 10;
