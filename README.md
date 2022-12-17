@@ -30,12 +30,12 @@ TODO:
   - [x] Elaboration
 - [x] IR simplifier
 - [x] IR lambda removal: eta expansion, closure conversion, lambda lifting
-- [ ] Bytecode generation
+- [x] Bytecode generation
   - [x] Primitives
   - [x] Boxing/unboxing
   - [x] foldNat
   - [x] main method
-  - [ ] Definitions without parameters to static properties
+  - [x] Definitions without parameters to static properties
 - [ ] Named sigma projection
 - [ ] Change Nat to Int and add binops
 - [ ] Bool type with if expression

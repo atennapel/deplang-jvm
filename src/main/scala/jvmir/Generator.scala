@@ -1,5 +1,6 @@
 package jvmir
 
+import common.Common.*
 import Syntax.*
 
 import org.objectweb.asm.*
@@ -84,6 +85,9 @@ object Generator:
     // generate definitions
     ds.toList.foreach(gen)
 
+    // generate static block
+    genStaticBlock(ds)
+
     // end
     cw.visitEnd()
     val bos = new BufferedOutputStream(
@@ -99,9 +103,44 @@ object Generator:
     case TNat  => Type.INT_TYPE
     case TPair => PAIR_TYPE
 
+  private def constantValue(e: Tm): Option[Any] = e match
+    case e if e.toInt.isDefined => Some(e.toInt.get)
+    case _                      => None
+
   private type Locals = IntMap[Int]
 
+  private def genStaticBlock(
+      ds0: Defs
+  )(implicit ctx: Ctx, cw: ClassWriter): Unit =
+    val ds = ds0.toList.filter {
+      case DDef(x, _, Nil, rt, b) if constantValue(b).isEmpty => true
+      case _                                                  => false
+    }
+    if ds.nonEmpty then
+      val m = new Method("<clinit>", Type.VOID_TYPE, Nil.toArray)
+      implicit val mg: GeneratorAdapter =
+        new GeneratorAdapter(ACC_STATIC, m, null, null, cw)
+      implicit val locals: Locals = IntMap.empty
+      ds.foreach(d => {
+        d match
+          case DDef(x, g, Nil, rt, b) =>
+            gen(b)
+            mg.putStatic(ctx.moduleType, x.expose, gen(rt))
+          case _ =>
+      })
+      mg.visitInsn(RETURN)
+      mg.endMethod()
+
   private def gen(d: Def)(implicit cw: ClassWriter, ctx: Ctx): Unit = d match
+    case DDef(x, g, Nil, rt, v) =>
+      cw.visitField(
+        (if g then ACC_PRIVATE + ACC_SYNTHETIC
+         else ACC_PUBLIC) + ACC_FINAL + ACC_STATIC,
+        x.expose,
+        gen(rt).getDescriptor,
+        null,
+        constantValue(v).orNull
+      )
     case DDef(x, g, ps, rt, v) =>
       val m = new Method(
         x.toString,
@@ -110,7 +149,7 @@ object Generator:
       )
       implicit val mg: GeneratorAdapter =
         new GeneratorAdapter(
-          (if g then ACC_PRIVATE else ACC_PUBLIC) + ACC_STATIC,
+          (if g then ACC_PRIVATE + ACC_SYNTHETIC else ACC_PUBLIC) + ACC_STATIC,
           m,
           null,
           null,
@@ -126,7 +165,11 @@ object Generator:
   )(implicit mg: GeneratorAdapter, ctx: Ctx, locals: Locals): Unit =
     t match
       case Arg(ix, ty) => mg.loadArg(ix)
+
+      case Global(x, TDef(Nil, rt), Nil) =>
+        mg.getStatic(ctx.moduleType, x.expose, gen(rt))
       case Global(x, TDef(ps, rt), as) =>
+        if ps.size != as.size then impossible()
         as.foreach(gen)
         mg.invokeStatic(
           ctx.moduleType,

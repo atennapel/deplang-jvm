@@ -1,0 +1,4 @@
+x ::= 3;
+y : Nat ** Nat ::= (1, 2);
+
+main : Nat -> Nat := \_. fst y;
