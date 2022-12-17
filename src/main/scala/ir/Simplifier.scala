@@ -70,6 +70,20 @@ object Simplifier:
 
     case If(t, True, a, b)  => Some(a)
     case If(t, False, a, b) => Some(b)
+
+    // lift lambdas out
+    case If(TDef(ps, rt), c, a, b) if ps.nonEmpty =>
+      val (vs, innerscope) =
+        ps.foldLeft[(List[(Int, Ty)], Set[Int])]((Nil, scope)) {
+          case ((vs, scope), ty) =>
+            val x = fresh(scope)
+            (vs ++ List((x, ty)), scope + x)
+        }
+      val spine = vs.map((x, t) => Local(x, TDef(t)))
+      val ea = a.apps(spine)
+      val eb = b.apps(spine)
+      Some(If(TDef(rt), c, ea, eb).lams(vs, rt))
+
     case If(t, c, a, b) =>
       go(c) match
         case Some(c) =>
@@ -84,3 +98,6 @@ object Simplifier:
       case (Some(a), None)    => Some((a, b))
       case (None, Some(b))    => Some((a, b))
       case (Some(a), Some(b)) => Some((a, b))
+
+  private def fresh(implicit scope: Set[Int]): Int =
+    if scope.isEmpty then 0 else scope.max + 1

@@ -78,7 +78,7 @@ object Compiler:
             val z = as(1)
             val (sps, _, s) = etaExpand(TDef(List(TNat, t), t), as(2))
             IR.FoldNat(go(t), go(n), go(z), sps(0)._1, sps(1)._1, go(s))
-          case _ => impossible()
+          case _ => println(f); impossible()
 
       case Pair(t1, t2, fst, snd) => IR.Pair(box(t1, go(fst)), box(t2, go(snd)))
       case Fst(ty, t)             => unbox(ty, IR.Fst(go(t)))
@@ -87,9 +87,10 @@ object Compiler:
       case Z    => IR.Z
       case S(n) => IR.S(go(n))
 
-      case True           => IR.True
-      case False          => IR.False
-      case If(t, c, a, b) => IR.If(go(t), go(c), go(a), go(b))
+      case True  => IR.True
+      case False => IR.False
+
+      case If(TDef(Nil, t), c, a, b) => IR.If(go(t), go(c), go(a), go(b))
 
       case _ => impossible()
 

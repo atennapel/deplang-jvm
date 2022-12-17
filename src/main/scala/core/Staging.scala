@@ -174,7 +174,7 @@ object Staging:
 
     case True
     case False
-    case If(ty: IR.Ty, cond: Tmp, ifTrue: Tmp, ifFalse: Tmp)
+    case If(ty: IR.TDef, cond: Tmp, ifTrue: Tmp, ifFalse: Tmp)
 
   private def quote0ir(v: Val0)(implicit k: Lvl): Tmp = v match
     case VVar0(l)    => Tmp.Local(l.toIx)
@@ -199,7 +199,7 @@ object Staging:
     case VTrue0           => Tmp.True
     case VFalse0          => Tmp.False
     case VIf0(t, c, a, b) =>
-      Tmp.If(quote1ty(t), quote0ir(c), quote0ir(a), quote0ir(b))
+      Tmp.If(quote1tdefOrTy(t), quote0ir(c), quote0ir(a), quote0ir(b))
     case _ => impossible()
 
   private def quote1ty(v: Val1)(implicit k: Lvl): IR.Ty = v match
@@ -215,6 +215,12 @@ object Staging:
       IR.TDef(ps.reverse ++ List(quote1ty(a)), quote1ty(b))
     case VFun1(a, VU0app(VVFFun1), b) => quote1tdef(b, quote1ty(a) :: ps)
     case t                            => impossible()
+
+  private def quote1tdefOrTy(v: Val1)(implicit k: Lvl): IR.TDef = v match
+    case VBool1             => IR.TDef(IR.TBool)
+    case VNat1              => IR.TDef(IR.TNat)
+    case VPairTy1(fst, snd) => IR.TDef(IR.TPair(quote1ty(fst), quote1ty(snd)))
+    case _                  => quote1tdef(v)
 
   private def stageIR(tm: Tm): Tmp =
     debug(s"stageIR $tm")
@@ -327,7 +333,7 @@ object Staging:
       val ec = check(c, IR.TBool)
       val ea = check(a, ty)
       val eb = check(b, ty)
-      (IR.If(ty, ec, ea, eb), IR.TDef(ty))
+      (IR.If(ty, ec, ea, eb), ty)
 
     case _ => impossible()
 

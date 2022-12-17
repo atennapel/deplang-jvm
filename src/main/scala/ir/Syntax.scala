@@ -40,7 +40,7 @@ object Syntax:
 
     case True
     case False
-    case If(ty: Ty, cond: Tm, ifTrue: Tm, ifFalse: Tm)
+    case If(ty: TDef, cond: Tm, ifTrue: Tm, ifFalse: Tm)
 
     override def toString: String = this match
       case Local(x, _)  => s"'$x"

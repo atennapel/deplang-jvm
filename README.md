@@ -38,7 +38,8 @@ TODO:
   - [x] Definitions without parameters to static properties
 - [x] Named sigma projection
 - [x] Bool type with if expression
-- [ ] Change Nat to Int and add binops
+- [x] Allow if to return lambdas
+- [ ] Add Int and primitive binops
 - [ ] Top-level recursion and basic tail-recursion
 - [ ] Datatypes
 - [ ] More simplification: case-of-case, app and case commutation

@@ -243,6 +243,7 @@ object Elaboration:
         val ef = check(f, ty, univ)
         force(univ) match
           case VUVal() =>
+          case VUFun() =>
           case _ => throw ElaborateError(s"if should return in U0 Val: $tm")
         If(ctx.quote(ty), ec, et, ef)
 
@@ -457,9 +458,13 @@ object Elaboration:
         (Pair(efst, esnd), VSigma(DontBind, t1, u1, CFun(_ => t2), u2), u2)
       case S.If(c, t, f) =>
         val ec = check(c, VBool, VUVal())
-        val (et, vty) = infer(t, VUVal())
-        val ef = check(f, vty, VUVal())
-        (If(ctx.quote(vty), ec, et, ef), vty, VUVal())
+        val (et, vty, u) = infer(t)
+        force(u) match
+          case VUVal() =>
+          case VUFun() =>
+          case _       => throw ElaborateError(s"if must return in U0")
+        val ef = check(f, vty, u)
+        (If(ctx.quote(vty), ec, et, ef), vty, u)
       case S.Hole(_) =>
         val u = ctx.eval(newMeta())
         val ty = ctx.eval(newMeta())
