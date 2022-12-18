@@ -31,6 +31,7 @@ object Staging:
     case VU0app(arg: Val1)
     case VNat1
     case VBool1
+    case VInt1
     case VFun1(left: Val1, vf: Val1, right: Val1)
     case VPairTy1(fst: Val1, snd: Val1)
     case VPair1(fst: Val1, snd: Val1)
@@ -52,6 +53,8 @@ object Staging:
     case VTrue0
     case VFalse0
     case VIf0(ty: Val1, cond: Val0, ifTrue: Val0, ifFalse: Val0)
+    case VIntLit0(value: Int)
+    case VBinop0(op: Op, left: Val0, right: Val0)
   import Val0.*
 
   private def vvar1(ix: Ix)(implicit env: Env): Val1 =
@@ -89,8 +92,9 @@ object Staging:
     case U0    => VU0
     case U1    => VU1
 
-    case Nat  => VNat1
-    case Bool => VBool1
+    case Nat   => VNat1
+    case Bool  => VBool1
+    case IntTy => VInt1
 
     case Sigma(_, a, _, b, _) => VPairTy1(eval1(a), eval1(b))
     case Pair(fst, snd)       => VPair1(eval1(fst), eval1(snd))
@@ -156,6 +160,9 @@ object Staging:
     case False          => VFalse0
     case If(t, c, a, b) => VIf0(eval1(t), eval0(c), eval0(a), eval0(b))
 
+    case IntLit(n)       => VIntLit0(n)
+    case Binop(op, a, b) => VBinop0(op, eval0(a), eval0(b))
+
     case _ => impossible()
 
   // staging
@@ -179,6 +186,9 @@ object Staging:
     case True
     case False
     case If(ty: IR.TDef, cond: Tmp, ifTrue: Tmp, ifFalse: Tmp)
+
+    case IntLit(value: Int)
+    case Binop(op: Op, left: Tmp, right: Tmp)
 
   private def quote0ir(v: Val0)(implicit k: Lvl): Tmp = v match
     case VVar0(l)    => Tmp.Local(l.toIx)
@@ -206,11 +216,14 @@ object Staging:
     case VFalse0          => Tmp.False
     case VIf0(t, c, a, b) =>
       Tmp.If(quote1tdefOrTy(t), quote0ir(c), quote0ir(a), quote0ir(b))
-    case _ => impossible()
+    case VIntLit0(n)       => Tmp.IntLit(n)
+    case VBinop0(op, a, b) => Tmp.Binop(op, quote0ir(a), quote0ir(b))
+    case _                 => impossible()
 
   private def quote1ty(v: Val1)(implicit k: Lvl): IR.Ty = v match
     case VNat1              => IR.TNat
     case VBool1             => IR.TBool
+    case VInt1              => IR.TInt
     case VPairTy1(fst, snd) => IR.TPair(quote1ty(fst), quote1ty(snd))
     case _                  => impossible()
 
@@ -225,6 +238,7 @@ object Staging:
   private def quote1tdefOrTy(v: Val1)(implicit k: Lvl): IR.TDef = v match
     case VBool1             => IR.TDef(IR.TBool)
     case VNat1              => IR.TDef(IR.TNat)
+    case VInt1              => IR.TDef(IR.TInt)
     case VPairTy1(fst, snd) => IR.TDef(IR.TPair(quote1ty(fst), quote1ty(snd)))
     case _                  => quote1tdef(v)
 
@@ -345,6 +359,19 @@ object Staging:
       val ea = check(a, ty)
       val eb = check(b, ty)
       (IR.If(ty, ec, ea, eb), ty)
+
+    case Tmp.IntLit(n) => (IR.IntLit(n), IR.TDef(IR.TInt))
+
+    case Tmp.Binop(op, a, b) =>
+      val ea = check(a, IR.TInt); val eb = check(b, IR.TInt)
+      val rt = op match
+        case OAdd => IR.TInt
+        case OMul => IR.TInt
+        case OSub => IR.TInt
+        case ODiv => IR.TInt
+        case OMod => IR.TInt
+        case _    => IR.TBool
+      (IR.Binop(op, ea, eb), IR.TDef(rt))
 
     case _ => impossible()
 

@@ -1,0 +1,7 @@
+fac : Int -> Int := \n.
+  let facR : Int -> Int -> Int := fix go n. \acc.
+    if n < 2 then acc
+    else go (n - 1) (acc * n) in
+  facR n 1;
+
+main : Int -> Int := \_. fac 10;

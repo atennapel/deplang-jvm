@@ -1,5 +1,6 @@
 package ir
 
+import common.Common.*
 import Syntax.*
 
 import scala.annotation.tailrec
@@ -72,6 +73,12 @@ object Simplifier:
     case True  => None
     case False => None
 
+    case IntLit(_) => None
+    case Binop(op, a, b) =>
+      binop(op, a, b) match
+        case Some(t) => Some(t)
+        case None    => go2(a, b).map(Binop(op, _, _))
+
     case If(t, True, a, b)  => Some(a)
     case If(t, False, a, b) => Some(b)
 
@@ -95,6 +102,28 @@ object Simplifier:
             case Some((a, b)) => Some(If(t, c, a, b))
             case None         => Some(If(t, c, a, b))
         case None => go2(a, b).map(If(t, c, _, _))
+
+  private def binop(op: Op, a: Tm, b: Tm): Option[Tm] = (op, a, b) match
+    case (OAdd, IntLit(a), IntLit(b)) => Some(IntLit(a + b))
+    case (OAdd, IntLit(0), b)         => Some(b)
+    case (OAdd, b, IntLit(0))         => Some(b)
+    case (OMul, IntLit(a), IntLit(b)) => Some(IntLit(a * b))
+    case (OMul, x, IntLit(1))         => Some(x)
+    case (OMul, IntLit(1), x)         => Some(x)
+    case (OMul, x, IntLit(0))         => Some(IntLit(0))
+    case (OMul, IntLit(0), x)         => Some(IntLit(0))
+    case (OSub, IntLit(a), IntLit(b)) => Some(IntLit(a - b))
+    case (OSub, x, IntLit(0))         => Some(x)
+    case (ODiv, IntLit(a), IntLit(b)) => Some(IntLit(a / b))
+    case (ODiv, x, IntLit(1))         => Some(x)
+    case (OMod, IntLit(a), IntLit(b)) => Some(IntLit(a % b))
+    case (OEq, IntLit(a), IntLit(b))  => Some(if a == b then True else False)
+    case (ONeq, IntLit(a), IntLit(b)) => Some(if a != b then True else False)
+    case (OGt, IntLit(a), IntLit(b))  => Some(if a > b then True else False)
+    case (OLt, IntLit(a), IntLit(b))  => Some(if a < b then True else False)
+    case (OGeq, IntLit(a), IntLit(b)) => Some(if a >= b then True else False)
+    case (OLeq, IntLit(a), IntLit(b)) => Some(if a <= b then True else False)
+    case _                            => None
 
   private def go2(a: Tm, b: Tm)(implicit scope: Set[Int]): Option[(Tm, Tm)] =
     (go(a), go(b)) match

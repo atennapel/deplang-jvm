@@ -102,6 +102,7 @@ object Generator:
   private def gen(t: Ty): Type = t match
     case TNat  => Type.INT_TYPE
     case TBool => Type.BOOLEAN_TYPE
+    case TInt  => Type.INT_TYPE
     case TPair => PAIR_TYPE
 
   private def constantValue(e: Tm): Option[Any] = e match
@@ -218,6 +219,71 @@ object Generator:
         mg.visitLabel(lFalse)
         gen(b)
         mg.visitLabel(lEnd)
+
+      case IntLit(n) => mg.push(n)
+      case Binop(op, a, b) =>
+        gen(a)
+        gen(b)
+        op match
+          case OAdd => mg.visitInsn(IADD)
+          case OMul => mg.visitInsn(IMUL)
+          case OSub => mg.visitInsn(ISUB)
+          case ODiv => mg.visitInsn(IDIV)
+          case OMod => mg.visitInsn(IREM)
+          case OEq =>
+            val skip = mg.newLabel()
+            val end = mg.newLabel()
+            mg.ifICmp(GeneratorAdapter.EQ, skip)
+            mg.push(false)
+            mg.visitJumpInsn(GOTO, end)
+            mg.visitLabel(skip)
+            mg.push(true)
+            mg.visitLabel(end)
+          case ONeq =>
+            val skip = mg.newLabel()
+            val end = mg.newLabel()
+            mg.ifICmp(GeneratorAdapter.NE, skip)
+            mg.push(false)
+            mg.visitJumpInsn(GOTO, end)
+            mg.visitLabel(skip)
+            mg.push(true)
+            mg.visitLabel(end)
+          case OLt =>
+            val skip = mg.newLabel()
+            val end = mg.newLabel()
+            mg.ifICmp(GeneratorAdapter.LT, skip)
+            mg.push(false)
+            mg.visitJumpInsn(GOTO, end)
+            mg.visitLabel(skip)
+            mg.push(true)
+            mg.visitLabel(end)
+          case OGt =>
+            val skip = mg.newLabel()
+            val end = mg.newLabel()
+            mg.ifICmp(GeneratorAdapter.GT, skip)
+            mg.push(false)
+            mg.visitJumpInsn(GOTO, end)
+            mg.visitLabel(skip)
+            mg.push(true)
+            mg.visitLabel(end)
+          case OLeq =>
+            val skip = mg.newLabel()
+            val end = mg.newLabel()
+            mg.ifICmp(GeneratorAdapter.LE, skip)
+            mg.push(false)
+            mg.visitJumpInsn(GOTO, end)
+            mg.visitLabel(skip)
+            mg.push(true)
+            mg.visitLabel(end)
+          case OGeq =>
+            val skip = mg.newLabel()
+            val end = mg.newLabel()
+            mg.ifICmp(GeneratorAdapter.GE, skip)
+            mg.push(false)
+            mg.visitJumpInsn(GOTO, end)
+            mg.visitLabel(skip)
+            mg.push(true)
+            mg.visitLabel(end)
 
       case FoldNat(ty, n, z, x1, x2, s) =>
         val vx1 = mg.newLocal(gen(TNat))

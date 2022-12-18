@@ -6,11 +6,13 @@ object Syntax:
   enum Ty:
     case TNat
     case TBool
+    case TInt
     case TPair(fst: Ty, snd: Ty)
 
     override def toString: String = this match
       case TNat            => "Nat"
       case TBool           => "Bool"
+      case TInt            => "Int"
       case TPair(fst, snd) => s"($fst ** $snd)"
   export Ty.*
 
@@ -43,6 +45,9 @@ object Syntax:
     case False
     case If(ty: TDef, cond: Tm, ifTrue: Tm, ifFalse: Tm)
 
+    case IntLit(value: Int)
+    case Binop(op: Op, left: Tm, right: Tm)
+
     override def toString: String = this match
       case Local(x, _)  => s"'$x"
       case Global(x, _) => s"$x"
@@ -64,6 +69,9 @@ object Syntax:
       case True           => "True"
       case False          => "False"
       case If(_, c, a, b) => s"(if $c then $a else $b)"
+
+      case IntLit(n)       => s"$n"
+      case Binop(op, a, b) => s"($a $op $b)"
 
     def flattenLams: (List[(Int, Ty)], Option[Ty], Tm) =
       def go(t: Tm): (List[(Int, Ty)], Option[Ty], Tm) = t match
@@ -103,6 +111,8 @@ object Syntax:
       case S(n) => n.freeVars
 
       case If(_, c, a, b) => c.freeVars ++ a.freeVars ++ b.freeVars
+
+      case Binop(_, a, b) => a.freeVars ++ b.freeVars
 
       case _ => Nil
 
@@ -178,6 +188,9 @@ object Syntax:
 
       case If(t, c, a, b) =>
         If(t, c.subst(sub, scope), a.subst(sub, scope), b.subst(sub, scope))
+
+      case Binop(op, a, b) =>
+        Binop(op, a.subst(sub, scope), b.subst(sub, scope))
 
       case _ => this
 

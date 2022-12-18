@@ -311,6 +311,8 @@ object Elaboration:
       case S.Var(Name("Bool"))  => (Bool, VUVal(), VU1)
       case S.Var(Name("True"))  => (True, VBool, VUVal())
       case S.Var(Name("False")) => (False, VBool, VUVal())
+      case S.Var(Name("Int"))   => (IntTy, VUVal(), VU1)
+      case S.IntLit(n)          => (IntLit(n), VInt, VUVal())
       case S.Var(Name("Nat"))   => (Nat, VUVal(), VU1)
       case S.Var(Name("Z"))     => (Z, VNat, VUVal())
       case S.App(S.Var(Name("S")), n, Expl) =>
@@ -329,6 +331,39 @@ object Elaboration:
           sty,
           VUFun()
         )
+      case S.App(S.App(S.Var(Name("+")), a, Expl), b, Expl) =>
+        val ea = check(a, VInt, VUVal()); val eb = check(b, VInt, VUVal())
+        (Binop(OAdd, ea, eb), VInt, VUVal())
+      case S.App(S.App(S.Var(Name("*")), a, Expl), b, Expl) =>
+        val ea = check(a, VInt, VUVal()); val eb = check(b, VInt, VUVal())
+        (Binop(OMul, ea, eb), VInt, VUVal())
+      case S.App(S.App(S.Var(Name("-")), a, Expl), b, Expl) =>
+        val ea = check(a, VInt, VUVal()); val eb = check(b, VInt, VUVal())
+        (Binop(OSub, ea, eb), VInt, VUVal())
+      case S.App(S.App(S.Var(Name("/")), a, Expl), b, Expl) =>
+        val ea = check(a, VInt, VUVal()); val eb = check(b, VInt, VUVal())
+        (Binop(ODiv, ea, eb), VInt, VUVal())
+      case S.App(S.App(S.Var(Name("%")), a, Expl), b, Expl) =>
+        val ea = check(a, VInt, VUVal()); val eb = check(b, VInt, VUVal())
+        (Binop(OMod, ea, eb), VInt, VUVal())
+      case S.App(S.App(S.Var(Name("==")), a, Expl), b, Expl) =>
+        val ea = check(a, VInt, VUVal()); val eb = check(b, VInt, VUVal())
+        (Binop(OEq, ea, eb), VBool, VUVal())
+      case S.App(S.App(S.Var(Name("!=")), a, Expl), b, Expl) =>
+        val ea = check(a, VInt, VUVal()); val eb = check(b, VInt, VUVal())
+        (Binop(ONeq, ea, eb), VBool, VUVal())
+      case S.App(S.App(S.Var(Name("<")), a, Expl), b, Expl) =>
+        val ea = check(a, VInt, VUVal()); val eb = check(b, VInt, VUVal())
+        (Binop(OLt, ea, eb), VBool, VUVal())
+      case S.App(S.App(S.Var(Name(">")), a, Expl), b, Expl) =>
+        val ea = check(a, VInt, VUVal()); val eb = check(b, VInt, VUVal())
+        (Binop(OGt, ea, eb), VBool, VUVal())
+      case S.App(S.App(S.Var(Name("<=")), a, Expl), b, Expl) =>
+        val ea = check(a, VInt, VUVal()); val eb = check(b, VInt, VUVal())
+        (Binop(OLeq, ea, eb), VBool, VUVal())
+      case S.App(S.App(S.Var(Name(">=")), a, Expl), b, Expl) =>
+        val ea = check(a, VInt, VUVal()); val eb = check(b, VInt, VUVal())
+        (Binop(OGeq, ea, eb), VBool, VUVal())
       /*
       n : Nat
       z : A

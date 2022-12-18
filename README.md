@@ -40,7 +40,7 @@ TODO:
 - [x] Bool type with if expression
 - [x] Allow if to return lambdas
 - [x] Fixpoint
-- [ ] Add Int and primitive binops
+- [x] Add Int and primitive binops
 - [ ] Remove Nat
 - [ ] Tail recursion
 - [ ] Datatypes

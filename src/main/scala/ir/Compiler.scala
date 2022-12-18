@@ -97,6 +97,9 @@ object Compiler:
       case True  => IR.True
       case False => IR.False
 
+      case IntLit(n)       => IR.IntLit(n)
+      case Binop(op, a, b) => IR.Binop(op, go(a), go(b))
+
       case If(TDef(Nil, t), c, a, b) => IR.If(go(t), go(c), go(a), go(b))
 
       case _ => impossible()
@@ -122,6 +125,7 @@ object Compiler:
   private def go(t: Ty): IR.Ty = t match
     case TNat        => IR.TNat
     case TBool       => IR.TBool
+    case TInt        => IR.TInt
     case TPair(_, _) => IR.TPair
 
   private def go(t: TDef): IR.TDef = t match
