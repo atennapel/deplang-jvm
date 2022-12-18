@@ -6,11 +6,13 @@ object Syntax:
   enum Ty:
     case TNat
     case TBool
+    case TInt
     case TPair
 
     override def toString: String = this match
       case TNat  => "Nat"
       case TBool => "Bool"
+      case TInt  => "Int"
       case TPair => s"Pair"
   export Ty.*
 
@@ -39,6 +41,8 @@ object Syntax:
     case False
     case If(ty: Ty, cond: Tm, ifTrue: Tm, ifFalse: Tm)
 
+    case IntLit(value: Int)
+
     case Box(ty: Ty, tm: Tm)
     case Unbox(ty: Ty, tm: Tm)
 
@@ -62,6 +66,8 @@ object Syntax:
       case True           => "True"
       case False          => "False"
       case If(_, c, a, b) => s"(if $c then $a else $b)"
+
+      case IntLit(n) => s"$n"
 
       case Box(ty, tm)   => s"(box {$ty} $tm)"
       case Unbox(ty, tm) => s"(unbox {$ty} $tm)"

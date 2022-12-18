@@ -72,6 +72,8 @@ object Pretty:
     case Bool                => pretty(tm)
     case True                => pretty(tm)
     case False               => pretty(tm)
+    case IntTy               => pretty(tm)
+    case IntLit(v)           => pretty(tm)
     case FoldNat(t) if app   => pretty(tm)
     case Pair(_, _)          => pretty(tm)
     case Proj(_, _)          => pretty(tm)
@@ -132,6 +134,10 @@ object Pretty:
     case False => "False"
     case If(_, c, a, b) =>
       s"if ${pretty(c)} then ${pretty(a)} else ${pretty(b)}"
+
+    case IntTy           => "Int"
+    case IntLit(v)       => s"$v"
+    case Binop(op, a, b) => s"$a $op $b"
 
     case Meta(id)            => s"?$id"
     case InsertedMeta(id, _) => s"?$id"

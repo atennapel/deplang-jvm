@@ -86,3 +86,7 @@ object Zonking:
     case True           => tm
     case False          => tm
     case If(t, c, a, b) => If(zonk(t), zonk(c), zonk(a), zonk(b))
+
+    case IntTy           => tm
+    case IntLit(v)       => tm
+    case Binop(op, a, b) => Binop(op, zonk(a), zonk(b))

@@ -34,6 +34,8 @@ object Syntax:
 
     case If(cond: Tm, ifTrue: Tm, ifFalse: Tm)
 
+    case IntLit(value: Int)
+
     case Hole(name: Option[Name])
 
     case Pos(pos: PosInfo, tm: Tm)
@@ -74,6 +76,8 @@ object Syntax:
       case Pair(fst, snd)         => s"($fst, $snd)"
 
       case If(c, a, b) => s"(if $c then $a else $b)"
+
+      case IntLit(n) => s"$n"
 
       case Hole(Some(x)) => s"_$x"
       case Hole(None)    => "_"

@@ -72,6 +72,8 @@ object Simplifier:
     case True  => None
     case False => None
 
+    case IntLit(_) => None
+
     case If(t, True, a, b)  => Some(a)
     case If(t, False, a, b) => Some(b)
 

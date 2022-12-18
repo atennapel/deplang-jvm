@@ -86,6 +86,35 @@ object Evaluation:
       VGlobal(x, SIf(sp, t, a, b), () => vif(v(), t, a, b))
     case _ => impossible()
 
+  def vbinop(op: Op, a: Val, b: Val): Val = (op, a, b) match
+    case (op, VIntLit(n), VIntLit(m)) =>
+      op match
+        case OAdd => VIntLit(n + m)
+        case OMul => VIntLit(n * m)
+        case OSub => VIntLit(n - m)
+        case ODiv => VIntLit(n / m)
+        case OMod => VIntLit(n % m)
+        case OEq  => if n == m then VTrue else VFalse
+        case ONeq => if n != m then VTrue else VFalse
+        case OLt  => if n < m then VTrue else VFalse
+        case OGt  => if n > m then VTrue else VFalse
+        case OLeq => if n <= m then VTrue else VFalse
+        case OGeq => if n >= m then VTrue else VFalse
+    case (OAdd, VIntLit(0), x)       => x
+    case (OAdd, x, VIntLit(0))       => x
+    case (OMul, VIntLit(0), x)       => VIntLit(0)
+    case (OMul, x, VIntLit(0))       => VIntLit(0)
+    case (OMul, VIntLit(1), x)       => x
+    case (OMul, x, VIntLit(1))       => x
+    case (ODiv, x, VIntLit(1))       => x
+    case (OSub, x, VIntLit(0))       => x
+    case (_, VFix(go, x, bd, sp), _) => VFix(go, x, bd, SBinop(sp, op, b))
+    case (_, VRigid(hd, sp), _)      => VRigid(hd, SBinop(sp, op, b))
+    case (_, VFlex(hd, sp), _)       => VFlex(hd, SBinop(sp, op, b))
+    case (_, VGlobal(x, sp, v), _) =>
+      VGlobal(x, SBinop(sp, op, b), () => vbinop(op, v(), b))
+    case _ => impossible()
+
   def vspine(v: Val, sp: Spine): Val = sp match
     case SId                   => v
     case SApp(sp, a, i)        => vapp(vspine(v, sp), a, i)
@@ -93,6 +122,7 @@ object Evaluation:
     case SFoldNat(sp, t, z, s) => vfoldnat(t, vspine(v, sp), z, s)
     case SProj(sp, p)          => vproj(vspine(v, sp), p)
     case SIf(sp, t, a, b)      => vif(vspine(v, sp), t, a, b)
+    case SBinop(a, op, b)      => vbinop(op, vspine(v, sp), b)
 
   def vmeta(id: MetaId): Val = getMeta(id) match
     case Unsolved     => VMeta(id)
@@ -148,6 +178,10 @@ object Evaluation:
     case False          => VFalse
     case If(t, c, a, b) => vif(eval(c), eval(t), eval(a), eval(b))
 
+    case IntTy           => VInt
+    case IntLit(v)       => VIntLit(v)
+    case Binop(op, a, b) => vbinop(op, eval(a), eval(b))
+
     case Meta(id)              => vmeta(id)
     case InsertedMeta(id, bds) => vappbds(vmeta(id), bds)
 
@@ -188,6 +222,7 @@ object Evaluation:
           quote(a, unfold),
           quote(b, unfold)
         )
+      case SBinop(a, op, b) => Binop(op, quote(hd, a, unfold), quote(b, unfold))
 
   private def quote(b: Clos, unfold: Unfold)(implicit k: Lvl): Tm =
     quote(b(VVar(k)), unfold)(k + 1)
@@ -245,5 +280,8 @@ object Evaluation:
       case VBool  => Bool
       case VTrue  => True
       case VFalse => False
+
+      case VInt       => IntTy
+      case VIntLit(v) => IntLit(v)
 
   def nf(tm: Tm)(implicit env: Env = Nil): Tm = quote(eval(tm))(mkLvl(env.size))

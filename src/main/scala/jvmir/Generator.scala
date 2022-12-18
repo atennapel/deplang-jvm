@@ -102,6 +102,7 @@ object Generator:
   private def gen(t: Ty): Type = t match
     case TNat  => Type.INT_TYPE
     case TBool => Type.BOOLEAN_TYPE
+    case TInt  => Type.INT_TYPE
     case TPair => PAIR_TYPE
 
   private def constantValue(e: Tm): Option[Any] = e match
@@ -218,6 +219,8 @@ object Generator:
         mg.visitLabel(lFalse)
         gen(b)
         mg.visitLabel(lEnd)
+
+      case IntLit(n) => mg.push(n)
 
       case FoldNat(ty, n, z, x1, x2, s) =>
         val vx1 = mg.newLocal(gen(TNat))

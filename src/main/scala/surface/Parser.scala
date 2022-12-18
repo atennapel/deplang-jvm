@@ -98,7 +98,7 @@ object Parser:
         ("(" *> (userOp
           .map(Var.apply) <|> sepEndBy(tm, ",").map(mkPair)) <* ")") <|>
         holeP <|>
-        nat <|>
+        natural.map(IntLit.apply) <|>
         ident.map(Var.apply)
     )
 
@@ -108,14 +108,6 @@ object Parser:
       case ts  => ts.reduceRight(Pair.apply)
 
     private val hole = Hole(None)
-
-    private val nZ = Var(Name("Z"))
-    private val nS = Var(Name("S"))
-    private lazy val nat: Parsley[Tm] = natural.map(n =>
-      var c: Tm = nZ
-      for (_ <- 0.until(n)) c = App(nS, c, Expl)
-      c
-    )
 
     lazy val tm: Parsley[Tm] = positioned(
       attempt(piSigma) <|> ifP <|> let <|> lam <|> fix <|>

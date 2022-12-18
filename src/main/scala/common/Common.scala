@@ -75,3 +75,20 @@ object Common:
 
   type BD = Boolean // false = bound, true = defined
   type BDs = List[BD]
+
+  enum Op:
+    case OAdd, OMul, OSub, ODiv, OMod, OEq, ONeq, OLt, OGt, OLeq, OGeq
+
+    override def toString: String = this match
+      case OAdd => "+"
+      case OMul => "*"
+      case OSub => "-"
+      case ODiv => "/"
+      case OMod => "%"
+      case OEq  => "=="
+      case ONeq => "!="
+      case OLt  => "<"
+      case OGt  => ">"
+      case OLeq => "<="
+      case OGeq => ">="
+  export Op.*

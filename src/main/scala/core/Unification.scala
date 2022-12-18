@@ -41,6 +41,7 @@ object Unification:
         )
       case SProj(sp, p)     => Proj(goSp(hd, sp), p)
       case SIf(sp, t, a, b) => If(go(t), goSp(hd, sp), go(a), go(b))
+      case SBinop(a, op, b) => Binop(op, goSp(hd, a), go(b))
 
     def goCl(c: Clos)(implicit pren: PRen): Tm =
       go(c(VVar(pren.cod)))(pren.lift)
@@ -101,6 +102,9 @@ object Unification:
       case VTrue  => True
       case VFalse => False
 
+      case VInt       => IntTy
+      case VIntLit(v) => IntLit(v)
+
     go(v)
 
   private def lams(sp: Spine, b: Tm): Tm =
@@ -146,18 +150,20 @@ object Unification:
   def unify(a: Val, b: Val)(implicit k: Lvl): Unit =
     debug(s"unify ${quote(a)} ~ ${quote(b)}")
     (force(a, UnfoldMetas), force(b, UnfoldMetas)) match
-      case (VVF, VVF)                 => ()
-      case (VVFVal, VVFVal)           => ()
-      case (VVFFun, VVFFun)           => ()
-      case (VU1, VU1)                 => ()
-      case (VNat, VNat)               => ()
-      case (VZ, VZ)                   => ()
-      case (VS(n), VS(m))             => unify(n, m)
-      case (VBool, VBool)             => ()
-      case (VTrue, VTrue)             => ()
-      case (VFalse, VFalse)           => ()
-      case (VLift(_, a), VLift(_, b)) => unify(a, b)
-      case (VQuote(a), VQuote(b))     => unify(a, b)
+      case (VVF, VVF)                         => ()
+      case (VVFVal, VVFVal)                   => ()
+      case (VVFFun, VVFFun)                   => ()
+      case (VU1, VU1)                         => ()
+      case (VNat, VNat)                       => ()
+      case (VZ, VZ)                           => ()
+      case (VS(n), VS(m))                     => unify(n, m)
+      case (VBool, VBool)                     => ()
+      case (VTrue, VTrue)                     => ()
+      case (VFalse, VFalse)                   => ()
+      case (VInt, VInt)                       => ()
+      case (VIntLit(a), VIntLit(b)) if a == b => ()
+      case (VLift(_, a), VLift(_, b))         => unify(a, b)
+      case (VQuote(a), VQuote(b))             => unify(a, b)
       case (VPi(_, _, t1, u11, b1, u12), VPi(_, _, t2, u21, b2, u22)) =>
         unify(t1, t2); unify(u11, u21); unify(b1, b2); unify(u12, u22)
       case (VSigma(_, t1, u11, b1, u12), VSigma(_, t2, u21, b2, u22)) =>
