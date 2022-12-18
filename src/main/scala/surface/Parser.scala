@@ -27,7 +27,8 @@ object Parser:
         "in",
         "if",
         "then",
-        "else"
+        "else",
+        "fix"
       ),
       operators = Set(
         "=",
@@ -117,7 +118,7 @@ object Parser:
     )
 
     lazy val tm: Parsley[Tm] = positioned(
-      attempt(piSigma) <|> ifP <|> let <|> lam <|>
+      attempt(piSigma) <|> ifP <|> let <|> lam <|> fix <|>
         precedence[Tm](app)(
           Ops(InfixR)("**" #> ((l, r) => Sigma(DontBind, l, r))),
           Ops(InfixR)("->" #> ((l, r) => Pi(DontBind, Expl, l, r)))
@@ -165,8 +166,10 @@ object Parser:
       )
 
     private lazy val ifP: Parsley[Tm] =
-      ("if" *> tm <~> "then" *> tm <~> "else" *> tm)
-        .map { case ((c, t), f) => If(c, t, f) }
+      positioned(
+        ("if" *> tm <~> "then" *> tm <~> "else" *> tm)
+          .map { case ((c, t), f) => If(c, t, f) }
+      )
 
     private lazy val lam: Parsley[Tm] =
       positioned(
@@ -178,6 +181,11 @@ object Parser:
     private lazy val lamParam: Parsley[(Bind, Icit)] =
       ("{" *> bind <* "}").map(x => (x, Impl)) <|>
         bind.map(x => (x, Expl))
+
+    private lazy val fix: Parsley[Tm] =
+      positioned(("fix" *> identOrOp <~> identOrOp <~> "." *> tm).map {
+        case ((go, x), b) => Fix(go, x, b)
+      })
 
     private lazy val app: Parsley[Tm] =
       precedence[Tm](appAtom)(
@@ -197,7 +205,7 @@ object Parser:
       )
 
     private lazy val appAtom: Parsley[Tm] = positioned(
-      (projAtom <~> many(arg) <~> option(let <|> lam))
+      (projAtom <~> many(arg) <~> option(let <|> lam <|> fix))
         .map { case ((fn, args), opt) =>
           (args ++ opt.map(t => (t, Expl))).foldLeft(fn) {
             case (fn, (arg, i)) =>

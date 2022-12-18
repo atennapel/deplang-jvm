@@ -1,0 +1,2 @@
+rec : Bool -> Bool -> Bool :=
+  \a. fix go b. if b then go a else go b;

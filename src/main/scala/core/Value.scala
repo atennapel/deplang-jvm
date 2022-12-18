@@ -13,6 +13,11 @@ object Value:
   object Clos:
     def apply(tm: Tm)(implicit env: Env): Clos = CClos(env, tm)
 
+  enum Clos2:
+    case CClos2(env: Env, tm: Tm)
+    case CFun2(fn: (Val, Val) => Val)
+  export Clos2.*
+
   enum Spine:
     case SId
     case SApp(spine: Spine, arg: Val, icit: Icit)
@@ -32,6 +37,7 @@ object Value:
     case VRigid(head: Head, spine: Spine)
     case VFlex(id: MetaId, spine: Spine)
     case VGlobal(name: Name, spine: Spine, value: () => Val)
+    case VFix(go: Name, name: Name, body: Clos2, spine: Spine)
 
     case VVF
     case VVFVal

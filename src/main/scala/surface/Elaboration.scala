@@ -195,6 +195,12 @@ object Elaboration:
       case (S.Lam(x, i1, b), VPi(_, i2, t, u1, rt, u2)) if i1 == i2 =>
         val eb = check(b, rt(VVar(ctx.lvl)), u2)(ctx.bind(x, t, u1))
         Lam(x, i1, eb)
+      case (S.Fix(go, x, b), VPi(_, Expl, t, u1, rt, u2)) =>
+        unify(u1, VUVal())
+        val eb = check(b, rt(VVar(ctx.lvl + 1)), u2)(
+          ctx.bind(DoBind(go), ty, VUFun()).bind(DoBind(x), t, VUVal())
+        )
+        Fix(go, x, eb)
       case (tm, VPi(x, Impl, t, u1, rt, u2)) =>
         val etm = check(tm, rt(VVar(ctx.lvl)), u2)(ctx.bind(x, t, u1, true))
         Lam(x, Impl, etm)

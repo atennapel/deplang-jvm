@@ -28,6 +28,7 @@ object Syntax:
     case Let(name: Int, ty: TDef, value: Tm, body: Tm)
 
     case Lam(name: Int, t1: Ty, t2: TDef, body: Tm)
+    case Fix(go: Int, name: Int, t1: Ty, t2: TDef, body: Tm)
     case App(fn: Tm, arg: Tm)
 
     case Pair(t1: Ty, t2: Ty, fst: Tm, snd: Tm)
@@ -48,8 +49,9 @@ object Syntax:
       case Let(x, t, v, b) =>
         s"(let '$x : $t = $v in $b)"
 
-      case Lam(x, _, _, b) => s"(\\'$x. $b)"
-      case App(f, a)       => s"($f $a)"
+      case Lam(x, _, _, b)     => s"(\\'$x. $b)"
+      case Fix(go, x, _, _, b) => s"(fix '$go '$x. $b)"
+      case App(f, a)           => s"($f $a)"
 
       case Pair(_, _, fst, snd) => s"($fst, $snd)"
       case Fst(_, t)            => s"(fst $t)"
@@ -77,8 +79,8 @@ object Syntax:
         (hd, as ++ List(a))
       case t => (t, Nil)
 
-    def lams(ps: List[(Int, Ty)], rt: Ty): Tm =
-      ps.foldRight[(Tm, TDef)]((this, TDef(rt))) { case ((x, t), (b, rt)) =>
+    def lams(ps: List[(Int, Ty)], rt: TDef): Tm =
+      ps.foldRight[(Tm, TDef)]((this, rt)) { case ((x, t), (b, rt)) =>
         (Lam(x, t, rt, b), TDef(t :: rt.params, rt.retrn))
       }._1
 
@@ -90,7 +92,9 @@ object Syntax:
         v.freeVars ++ b.freeVars.filterNot((y, _) => x == y)
 
       case Lam(x, _, _, b) => b.freeVars.filterNot((y, _) => x == y)
-      case App(f, a)       => f.freeVars ++ a.freeVars
+      case Fix(go, x, _, _, b) =>
+        b.freeVars.filterNot((y, _) => x == y || go == y)
+      case App(f, a) => f.freeVars ++ a.freeVars
 
       case Pair(_, _, fst, snd) => fst.freeVars ++ snd.freeVars
       case Fst(_, t)            => t.freeVars
@@ -124,6 +128,46 @@ object Syntax:
         val y = scope.max + 1
         Lam(y, t1, t2, b.subst(sub + (x -> Local(y, TDef(t1))), scope + y))
       case App(f, a) => App(f.subst(sub, scope), a.subst(sub, scope))
+
+      case Fix(go, x, t1, t2, b) if !scope.contains(go) && !scope.contains(x) =>
+        Fix(go, x, t1, t2, b.subst(sub - go - x, scope + go + x))
+      case Fix(go, x, t1, t2, b) if scope.contains(go) && !scope.contains(x) =>
+        val go2 = scope.max + 1
+        Fix(
+          go2,
+          x,
+          t1,
+          t2,
+          b.subst(
+            sub + (go -> Local(go2, TDef(t1, t2))),
+            scope + go2
+          )
+        )
+      case Fix(go, x, t1, t2, b) if !scope.contains(go) && scope.contains(x) =>
+        val x2 = scope.max + 1
+        Fix(
+          go,
+          x2,
+          t1,
+          t2,
+          b.subst(
+            sub + (x -> Local(x2, TDef(t1))),
+            scope + x2
+          )
+        )
+      case Fix(go, x, t1, t2, b) =>
+        val go2 = scope.max + 1
+        val x2 = (scope + go2).max + 1
+        Fix(
+          go2,
+          x2,
+          t1,
+          t2,
+          b.subst(
+            sub + (go -> Local(go2, TDef(t1, t2))) + (x -> Local(x2, TDef(t1))),
+            scope + go2 + x2
+          )
+        )
 
       case Pair(t1, t2, fst, snd) =>
         Pair(t1, t2, fst.subst(sub, scope), snd.subst(sub, scope))

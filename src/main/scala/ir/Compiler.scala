@@ -66,6 +66,10 @@ object Compiler:
         val g = lambdaLift(uniq.updateGetOld(_ + 1), TDef(t1, t2), t)
         go(g)
 
+      case Fix(g, x, t1, t2, b) =>
+        val glb = fixLift(uniq.updateGetOld(_ + 1), g, x, t1, t2, b)
+        go(glb) // TODO: needs to be wrapped in lambda
+
       case App(f0, a) =>
         val (f, as) = t.flattenApps
         f match
@@ -78,7 +82,10 @@ object Compiler:
             val z = as(1)
             val (sps, _, s) = etaExpand(TDef(List(TNat, t), t), as(2))
             IR.FoldNat(go(t), go(n), go(z), sps(0)._1, sps(1)._1, go(s))
-          case _ => println(f); impossible()
+          case Fix(g, x, t1, t2, b) =>
+            val glb = fixLift(uniq.updateGetOld(_ + 1), g, x, t1, t2, b)
+            go(glb.apps(as))
+          case _ => impossible()
 
       case Pair(t1, t2, fst, snd) => IR.Pair(box(t1, go(fst)), box(t2, go(snd)))
       case Fst(ty, t)             => unbox(ty, IR.Fst(go(t)))
@@ -136,7 +143,7 @@ object Compiler:
         val rest = eta(TDef(ts, rt), Nil, scope + y)
         (y, t) :: rest
       case (TDef(t1 :: ts, rt), (x, t2) :: rest) if t1 == t2 =>
-        eta(TDef(ts, rt), rest, scope)
+        eta(TDef(ts, rt), rest, scope + x)
       case _ => impossible()
 
   private def etaExpand(t: TDef, v: Tm): (List[(Int, Ty)], Ty, Tm) =
@@ -151,12 +158,14 @@ object Compiler:
       defs: NewDefs
   ): Tm =
     val (ps, rt, d) = etaExpand(t, v)
-    val fv = v.freeVars.map((x, t) => {
-      if t.params.nonEmpty then impossible()
-      x -> t.retrn
-    })
+    val fv = v.freeVars
+      .map((x, t) => {
+        if t.params.nonEmpty then impossible()
+        x -> t.retrn
+      })
+      .distinctBy((y, _) => y)
     val nps = fv ++ ps
-    val vv = d.lams(nps, rt)
+    val vv = d.lams(nps, TDef(rt))
     val newname = Name(s"$name$$$x")
     val args = nps.zipWithIndex.map { case ((x, _), ix) =>
       x -> ix
@@ -171,3 +180,34 @@ object Compiler:
     defs += newdef
     Global(newname, TDef(nps.map(_._2), rt))
       .apps(fv.map((x, t) => Local(x, TDef(t))))
+
+  private def fixLift(x: Int, g: Int, y: Int, t1: Ty, t: TDef, v: Tm)(implicit
+      name: Name,
+      defs: NewDefs
+  ): Tm =
+    val (ps, rt, d) = etaExpand(t, v)
+    val fv = v.freeVars
+      .filterNot((z, _) => z == g || z == y)
+      .map((x, t) => {
+        if t.params.nonEmpty then impossible()
+        x -> t.retrn
+      })
+      .distinctBy((y, _) => y)
+    val nps = fv ++ List((y, t1)) ++ ps
+    val vv = d.lams(nps, TDef(rt))
+    val newname = Name(s"$name$$$x")
+    val args = nps.zipWithIndex.map { case ((x, _), ix) =>
+      x -> ix
+    }.toMap
+    val gl = Global(newname, TDef(nps.map(_._2), rt))
+      .apps(fv.map((x, t) => Local(x, TDef(t))))
+    val d2 = d.subst(Map(g -> gl))
+    val newdef = IR.DDef(
+      newname,
+      true,
+      nps.map((_, t) => go(t)),
+      go(rt),
+      go(d2)(newname, args, defs, Ref(0))
+    )
+    defs += newdef
+    gl

@@ -41,6 +41,7 @@ object Staging:
     case VGlobal0(name: Name)
     case VApp0(fn: Val0, arg: Val0)
     case VLam0(name: Bind, body: Val0 => Val0)
+    case VFix0(go: Name, name: Name, body: (Val0, Val0) => Val0)
     case VLet0(name: Name, vf: Val1, ty: Val1, value: Val0, body: Val0 => Val0)
     case VPair0(fst: Val0, snd: Val0)
     case VFst0(tm: Val0)
@@ -136,6 +137,8 @@ object Staging:
       VLet0(x, eval1(u), eval1(t), eval0(v), v => eval0Bind(b, v))
 
     case Lam(x, _, b) => VLam0(x, v => eval0Bind(b, v))
+    case Fix(go, x, b) =>
+      VFix0(go, x, (v, w) => eval0(b)(Def0(Def0(env, v), w)))
     case App(f, a, _) => VApp0(eval0(f), eval0(a))
 
     case Pair(fst, snd) => VPair0(eval0(fst), eval0(snd))
@@ -162,6 +165,7 @@ object Staging:
     case Let(name: Name, ty: IR.TDef, value: Tmp, body: Tmp)
 
     case Lam(name: Bind, body: Tmp)
+    case Fix(go: Name, name: Name, body: Tmp)
     case App(fn: Tmp, arg: Tmp)
 
     case Pair(fst: Tmp, snd: Tmp)
@@ -181,6 +185,8 @@ object Staging:
     case VGlobal0(x) => Tmp.Global(x)
     case VApp0(f, a) => Tmp.App(quote0ir(f), quote0ir(a))
     case VLam0(x, b) => Tmp.Lam(x, quote0ir(b(VVar0(k)))(k + 1))
+    case VFix0(go, x, b) =>
+      Tmp.Fix(go, x, quote0ir(b(VVar0(k), VVar0(k + 1)))(k + 2))
     case VLet0(x, VU0app(VVFVal1), t, v, b) =>
       Tmp.Let(
         x,
@@ -260,6 +266,11 @@ object Staging:
         val (n, nctx) = ctx.bind(IR.TDef(pt))
         val eb = check(b, IR.TDef(ps, rt))(nctx, globals)
         IR.Lam(n, pt, IR.TDef(ps, rt), eb)
+      case (Tmp.Fix(go, x, b), ty @ IR.TDef(pt :: ps, rt)) =>
+        val (n1, nctx1) = ctx.bind(ty)
+        val (n2, nctx2) = nctx1.bind(IR.TDef(pt))
+        val eb = check(b, IR.TDef(ps, rt))(nctx2, globals)
+        IR.Fix(n1, n2, pt, IR.TDef(ps, rt), eb)
       case (Tmp.Let(x, t, v, b), ty) =>
         val ev = check(v, t)
         val (n, nctx) = ctx.bind(t)

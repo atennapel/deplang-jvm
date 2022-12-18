@@ -12,32 +12,49 @@ object Evaluation:
       case CClos(env, tm) => eval(tm)(v :: env)
       case CFun(f)        => f(v)
 
+  extension (c: Clos2)
+    def apply(v: Val, w: Val): Val = c match
+      case CClos2(env, tm) => eval(tm)(w :: v :: env)
+      case CFun2(f)        => f(v, w)
+
+  private def isNeutral(v: Val): Boolean = v match
+    case VRigid(_, _)     => false
+    case VFlex(_, _)      => false
+    case VGlobal(_, _, _) => false
+    case VFix(_, _, _, _) => false
+    case _                => true
+
   def vapp(f: Val, a: Val, i: Icit): Val = f match
-    case VLam(_, _, b)     => b(a)
-    case VRigid(hd, sp)    => VRigid(hd, SApp(sp, a, i))
-    case VFlex(id, sp)     => VFlex(id, SApp(sp, a, i))
-    case VGlobal(x, sp, v) => VGlobal(x, SApp(sp, a, i), () => vapp(v(), a, i))
-    case _                 => impossible()
+    case VLam(_, _, b)                       => b(a)
+    case VFix(go, x, b, SId) if isNeutral(a) => b(f, a)
+    case VRigid(hd, sp)                      => VRigid(hd, SApp(sp, a, i))
+    case VFlex(id, sp)                       => VFlex(id, SApp(sp, a, i))
+    case VGlobal(x, sp, v)  => VGlobal(x, SApp(sp, a, i), () => vapp(v(), a, i))
+    case VFix(go, x, b, sp) => VFix(go, x, b, SApp(sp, a, i))
+    case _                  => impossible()
 
   def vquote(v: Val): Val = v match
+    case VFix(go, x, b, SSplice(sp)) => VFix(go, x, b, sp)
     case VRigid(hd, SSplice(sp))     => VRigid(hd, sp)
     case VFlex(hd, SSplice(sp))      => VFlex(hd, sp)
     case VGlobal(hd, SSplice(sp), v) => VGlobal(hd, sp, () => vquote(v()))
     case v                           => VQuote(v)
 
   def vsplice(v: Val): Val = v match
-    case VQuote(v)         => v
-    case VRigid(hd, sp)    => VRigid(hd, SSplice(sp))
-    case VFlex(hd, sp)     => VFlex(hd, SSplice(sp))
-    case VGlobal(x, sp, v) => VGlobal(x, SSplice(sp), () => vsplice(v()))
-    case _                 => impossible()
+    case VQuote(v)          => v
+    case VFix(go, x, b, sp) => VFix(go, x, b, SSplice(sp))
+    case VRigid(hd, sp)     => VRigid(hd, SSplice(sp))
+    case VFlex(hd, sp)      => VFlex(hd, SSplice(sp))
+    case VGlobal(x, sp, v)  => VGlobal(x, SSplice(sp), () => vsplice(v()))
+    case _                  => impossible()
 
   def vfoldnat(t: VTy, n: Val, z: Val, s: Val): Val = n match
     case VZ => z
     // foldNat {t} (S n) z s ~> s n (foldNat {t} n z s)
-    case VS(n)          => vapp(vapp(s, n, Expl), vfoldnat(t, n, z, s), Expl)
-    case VRigid(hd, sp) => VRigid(hd, SFoldNat(sp, t, z, s))
-    case VFlex(hd, sp)  => VFlex(hd, SFoldNat(sp, t, z, s))
+    case VS(n) => vapp(vapp(s, n, Expl), vfoldnat(t, n, z, s), Expl)
+    case VFix(go, x, b, sp) => VFix(go, x, b, SFoldNat(sp, t, z, s))
+    case VRigid(hd, sp)     => VRigid(hd, SFoldNat(sp, t, z, s))
+    case VFlex(hd, sp)      => VFlex(hd, SFoldNat(sp, t, z, s))
     case VGlobal(x, sp, v) =>
       VGlobal(x, SFoldNat(sp, t, z, s), () => vfoldnat(t, v(), z, s))
     case _ => impossible()
@@ -49,8 +66,9 @@ object Evaluation:
         case Snd         => snd
         case Named(_, 0) => fst
         case Named(x, i) => vproj(snd, Named(x, i - 1))
-    case VRigid(hd, sp) => VRigid(hd, SProj(sp, proj))
-    case VFlex(hd, sp)  => VFlex(hd, SProj(sp, proj))
+    case VFix(go, x, b, sp) => VFix(go, x, b, SProj(sp, proj))
+    case VRigid(hd, sp)     => VRigid(hd, SProj(sp, proj))
+    case VFlex(hd, sp)      => VFlex(hd, SProj(sp, proj))
     case VGlobal(x, sp, v) =>
       VGlobal(x, SProj(sp, proj), () => vproj(v(), proj))
     case _ => impossible()
@@ -59,10 +77,11 @@ object Evaluation:
   def vsnd(v: Val): Val = vproj(v, Snd)
 
   def vif(c: Val, t: VTy, a: Val, b: Val): Val = c match
-    case VTrue          => a
-    case VFalse         => b
-    case VRigid(hd, sp) => VRigid(hd, SIf(sp, t, a, b))
-    case VFlex(hd, sp)  => VFlex(hd, SIf(sp, t, a, b))
+    case VTrue               => a
+    case VFalse              => b
+    case VFix(go, x, bd, sp) => VFix(go, x, bd, SIf(sp, t, a, b))
+    case VRigid(hd, sp)      => VRigid(hd, SIf(sp, t, a, b))
+    case VFlex(hd, sp)       => VFlex(hd, SIf(sp, t, a, b))
     case VGlobal(x, sp, v) =>
       VGlobal(x, SIf(sp, t, a, b), () => vif(v(), t, a, b))
     case _ => impossible()
@@ -103,8 +122,9 @@ object Evaluation:
 
     case Pi(x, i, t, u1, b, u2) =>
       VPi(x, i, eval(t), eval(u1), Clos(b), eval(u2))
-    case Lam(x, i, b) => VLam(x, i, Clos(b))
-    case App(f, a, i) => vapp(eval(f), eval(a), i)
+    case Lam(x, i, b)  => VLam(x, i, Clos(b))
+    case App(f, a, i)  => vapp(eval(f), eval(a), i)
+    case Fix(go, x, b) => VFix(go, x, CClos2(env, b), SId)
 
     case Sigma(x, t, u1, b, u2) =>
       VSigma(x, eval(t), eval(u1), Clos(b), eval(u2))
@@ -181,6 +201,12 @@ object Evaluation:
       case VRigid(hd, sp)    => quote(quote(hd), sp, unfold)
       case VFlex(hd, sp)     => quote(Meta(hd), sp, unfold)
       case VGlobal(x, sp, v) => quote(Global(x), sp, unfold)
+      case VFix(go, x, b, sp) =>
+        quote(
+          Fix(go, x, quote(b(VVar(k), VVar(k + 1)), unfold)(k + 2)),
+          sp,
+          unfold
+        )
 
       case VVF    => VF
       case VVFVal => VFVal

@@ -39,8 +39,10 @@ TODO:
 - [x] Named sigma projection
 - [x] Bool type with if expression
 - [x] Allow if to return lambdas
+- [x] Fixpoint
 - [ ] Add Int and primitive binops
-- [ ] Top-level recursion and basic tail-recursion
+- [ ] Remove Nat
+- [ ] Tail recursion
 - [ ] Datatypes
 - [ ] More simplification: case-of-case, app and case commutation
 - [ ] Better inlining (inline linear lambdas, constants, globals)

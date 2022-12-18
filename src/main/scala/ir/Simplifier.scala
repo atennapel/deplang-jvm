@@ -9,9 +9,10 @@ import scala.annotation.tailrec
 2. inlining (let var is used once)
 3. dead code removal (let var is not used)
 4. (let f = \x. ... in t) u ~> let f = \x ... in t u
+5. lift lambdas out of eliminators and fix
  */
 object Simplifier:
-  private val LIMIT = 100
+  private val LIMIT = 1000
 
   def simplify(ds: Defs): Defs = Defs(ds.toList.map(go))
 
@@ -37,6 +38,9 @@ object Simplifier:
       else go2(v, b).map((v, b) => Let(x, t, v, b))
 
     case Lam(x, t1, t2, b) => go(b)(scope + x).map(b => Lam(x, t1, t2, b))
+
+    case Fix(g, x, t1, t2, b) =>
+      go(b)(scope + g + x).map(b => Fix(g, x, t1, t2, b))
 
     case App(Let(x, t, v, b), a) =>
       if scope.contains(x) then
@@ -82,7 +86,7 @@ object Simplifier:
       val spine = vs.map((x, t) => Local(x, TDef(t)))
       val ea = a.apps(spine)
       val eb = b.apps(spine)
-      Some(If(TDef(rt), c, ea, eb).lams(vs, rt))
+      Some(If(TDef(rt), c, ea, eb).lams(vs, TDef(rt)))
 
     case If(t, c, a, b) =>
       go(c) match
