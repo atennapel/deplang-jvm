@@ -31,8 +31,8 @@ object Staging:
     case VU0app(arg: Val1)
     case VBool1
     case VInt1
-    case VFun1(left: Val1, vf: Val1, right: Val1)
-    case VPairTy1(fst: Val1, snd: Val1)
+    case VFun1(left: Val1, vf: Val1, right: Val1 => Val1)
+    case VPairTy1(fst: Val1, snd: Val1 => Val1)
     case VPair1(fst: Val1, snd: Val1)
   import Val1.*
 
@@ -91,11 +91,11 @@ object Staging:
     case Bool  => VBool1
     case IntTy => VInt1
 
-    case Sigma(_, a, _, b, _) => VPairTy1(eval1(a), eval1(b))
+    case Sigma(_, a, _, b, _) => VPairTy1(eval1(a), v => eval1Bind(b, v))
     case Pair(fst, snd)       => VPair1(eval1(fst), eval1(snd))
     case Proj(t, p)           => vproj1(eval1(t), p)
 
-    case Pi(x, _, a, _, b, u) => VFun1(eval1(a), eval1(u), eval1(b))
+    case Pi(x, _, a, _, b, u) => VFun1(eval1(a), eval1(u), v => eval1Bind(b, v))
     case Lam(x, _, b)         => VLam1(v => eval1Bind(b, v))
     case App(f, a, _)         => vapp1(eval1(f), eval1(a))
 
@@ -205,24 +205,27 @@ object Staging:
     case _                 => impossible()
 
   private def quote1ty(v: Val1)(implicit k: Lvl): IR.Ty = v match
-    case VBool1             => IR.TBool
-    case VInt1              => IR.TInt
-    case VPairTy1(fst, snd) => IR.TPair(quote1ty(fst), quote1ty(snd))
-    case _                  => impossible()
+    case VBool1 => IR.TBool
+    case VInt1  => IR.TInt
+    case VPairTy1(fst, snd) =>
+      IR.TPair(quote1ty(fst), quote1ty(snd(null))(k + 1))
+    case _ => impossible()
 
   private def quote1tdef(v: Val1, ps: List[IR.Ty] = Nil)(implicit
       k: Lvl
   ): IR.TDef = v match
     case VFun1(a, VU0app(VVFVal1), b) =>
-      IR.TDef(ps.reverse ++ List(quote1ty(a)), quote1ty(b))
-    case VFun1(a, VU0app(VVFFun1), b) => quote1tdef(b, quote1ty(a) :: ps)
-    case t                            => impossible()
+      IR.TDef(ps.reverse ++ List(quote1ty(a)), quote1ty(b(null))(k + 1))
+    case VFun1(a, VU0app(VVFFun1), b) =>
+      quote1tdef(b(null), quote1ty(a) :: ps)(k + 1)
+    case t => impossible()
 
   private def quote1tdefOrTy(v: Val1)(implicit k: Lvl): IR.TDef = v match
-    case VBool1             => IR.TDef(IR.TBool)
-    case VInt1              => IR.TDef(IR.TInt)
-    case VPairTy1(fst, snd) => IR.TDef(IR.TPair(quote1ty(fst), quote1ty(snd)))
-    case _                  => quote1tdef(v)
+    case VBool1 => IR.TDef(IR.TBool)
+    case VInt1  => IR.TDef(IR.TInt)
+    case VPairTy1(fst, snd) =>
+      IR.TDef(IR.TPair(quote1ty(fst), quote1ty(snd(null))(k + 1)))
+    case _ => quote1tdef(v)
 
   private def stageIR(tm: Tm): Tmp =
     debug(s"stageIR $tm")
