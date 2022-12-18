@@ -29,7 +29,6 @@ object Staging:
     case VU1
     case VU0
     case VU0app(arg: Val1)
-    case VNat1
     case VBool1
     case VInt1
     case VFun1(left: Val1, vf: Val1, right: Val1)
@@ -47,9 +46,6 @@ object Staging:
     case VPair0(fst: Val0, snd: Val0)
     case VFst0(tm: Val0)
     case VSnd0(tm: Val0)
-    case VZ0
-    case VS0(n: Val0)
-    case VFoldNat0(ty: Val1)
     case VTrue0
     case VFalse0
     case VIf0(ty: Val1, cond: Val0, ifTrue: Val0, ifFalse: Val0)
@@ -92,7 +88,6 @@ object Staging:
     case U0    => VU0
     case U1    => VU1
 
-    case Nat   => VNat1
     case Bool  => VBool1
     case IntTy => VInt1
 
@@ -152,10 +147,6 @@ object Staging:
 
     case Wk(t) => eval0(t)(env.tail)
 
-    case Z          => VZ0
-    case S(n)       => VS0(eval0(n))
-    case FoldNat(t) => VFoldNat0(eval1(t))
-
     case True           => VTrue0
     case False          => VFalse0
     case If(t, c, a, b) => VIf0(eval1(t), eval0(c), eval0(a), eval0(b))
@@ -178,10 +169,6 @@ object Staging:
     case Pair(fst: Tmp, snd: Tmp)
     case Fst(tm: Tmp)
     case Snd(tm: Tmp)
-
-    case Z
-    case S(n: Tmp)
-    case FoldNat(ty: IR.Ty)
 
     case True
     case False
@@ -206,9 +193,6 @@ object Staging:
       )
     case VLet0(x, VU0app(VVFFun1), t, v, b) =>
       Tmp.Let(x, quote1tdef(t), quote0ir(v), quote0ir(b(VVar0(k)))(k + 1))
-    case VZ0              => Tmp.Z
-    case VS0(n)           => Tmp.S(quote0ir(n))
-    case VFoldNat0(t)     => Tmp.FoldNat(quote1ty(t))
     case VPair0(fst, snd) => Tmp.Pair(quote0ir(fst), quote0ir(snd))
     case VFst0(t)         => Tmp.Fst(quote0ir(t))
     case VSnd0(t)         => Tmp.Snd(quote0ir(t))
@@ -221,7 +205,6 @@ object Staging:
     case _                 => impossible()
 
   private def quote1ty(v: Val1)(implicit k: Lvl): IR.Ty = v match
-    case VNat1              => IR.TNat
     case VBool1             => IR.TBool
     case VInt1              => IR.TInt
     case VPairTy1(fst, snd) => IR.TPair(quote1ty(fst), quote1ty(snd))
@@ -237,7 +220,6 @@ object Staging:
 
   private def quote1tdefOrTy(v: Val1)(implicit k: Lvl): IR.TDef = v match
     case VBool1             => IR.TDef(IR.TBool)
-    case VNat1              => IR.TDef(IR.TNat)
     case VInt1              => IR.TDef(IR.TInt)
     case VPairTy1(fst, snd) => IR.TDef(IR.TPair(quote1ty(fst), quote1ty(snd)))
     case _                  => quote1tdef(v)
@@ -316,11 +298,6 @@ object Staging:
       val (eb, rt) = infer(b)(nctx, globals)
       (IR.Let(n, t, ev, eb), rt)
 
-    case Tmp.App(Tmp.App(Tmp.App(Tmp.FoldNat(ty), n), z), s) =>
-      val en = check(n, IR.TNat)
-      val ez = check(z, ty)
-      val es = check(s, IR.TDef(List(IR.TNat, ty), ty))
-      (IR.App(IR.App(IR.App(IR.FoldNat(ty), en), ez), es), IR.TDef(ty))
     case Tmp.App(f, a) =>
       val (ef, ft) = infer(f)
       ft match
@@ -346,11 +323,6 @@ object Staging:
       ty match
         case IR.TDef(Nil, IR.TPair(_, snd)) => (IR.Snd(snd, et), IR.TDef(snd))
         case _                              => impossible()
-
-    case Tmp.Z => (IR.Z, IR.TDef(IR.TNat))
-    case Tmp.S(n) =>
-      val en = check(n, IR.TNat)
-      (IR.S(en), IR.TDef(IR.TNat))
 
     case Tmp.True  => (IR.True, IR.TDef(IR.TBool))
     case Tmp.False => (IR.False, IR.TDef(IR.TBool))

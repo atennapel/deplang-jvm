@@ -5,3 +5,10 @@ fac : Int -> Int := \n.
   facR n 1;
 
 main : Int -> Int := \_. fac 10;
+
+fold : {A : U0 Val} -> Int -> A -> (Int -> A -> A) -> A =
+  \{A} n z s.
+    let foldR : Int -> A -> A = fix go c. \acc.
+      if c <= 0 then acc
+      else go (c - 1) (s c acc) in
+    foldR n z;

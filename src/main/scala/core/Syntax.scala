@@ -42,11 +42,6 @@ object Syntax:
 
     case Wk(tm: Tm)
 
-    case Nat
-    case Z
-    case S(n: Tm)
-    case FoldNat(ty: Ty)
-
     case Bool
     case True
     case False
@@ -96,11 +91,6 @@ object Syntax:
       case Splice(t)  => s"$$$t"
 
       case Wk(t) => s"(Wk $t)"
-
-      case Nat        => "Nat"
-      case Z          => "Z"
-      case S(n)       => s"(S $n)"
-      case FoldNat(t) => s"(foldNat {$t})"
 
       case Bool           => "Bool"
       case True           => "True"

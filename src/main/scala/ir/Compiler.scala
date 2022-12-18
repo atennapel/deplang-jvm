@@ -76,12 +76,6 @@ object Compiler:
           case Global(x, t) =>
             if t.params.size != as.size then impossible()
             IR.Global(norm(x), go(t), as.map(go))
-          case FoldNat(t) =>
-            if as.size != 3 then impossible()
-            val n = as(0)
-            val z = as(1)
-            val (sps, _, s) = etaExpand(TDef(List(TNat, t), t), as(2))
-            IR.FoldNat(go(t), go(n), go(z), sps(0)._1, sps(1)._1, go(s))
           case Fix(g, x, t1, t2, b) =>
             val glb = fixLift(uniq.updateGetOld(_ + 1), g, x, t1, t2, b)
             go(glb.apps(as))
@@ -90,9 +84,6 @@ object Compiler:
       case Pair(t1, t2, fst, snd) => IR.Pair(box(t1, go(fst)), box(t2, go(snd)))
       case Fst(ty, t)             => unbox(ty, IR.Fst(go(t)))
       case Snd(ty, t)             => unbox(ty, IR.Snd(go(t)))
-
-      case Z    => IR.Z
-      case S(n) => IR.S(go(n))
 
       case True  => IR.True
       case False => IR.False
@@ -123,7 +114,6 @@ object Compiler:
         case _               => IR.Unbox(ct, tm)
 
   private def go(t: Ty): IR.Ty = t match
-    case TNat        => IR.TNat
     case TBool       => IR.TBool
     case TInt        => IR.TInt
     case TPair(_, _) => IR.TPair

@@ -77,11 +77,6 @@ object Zonking:
 
     case Wk(t) => Wk(zonk(t)(l - 1, e.tail))
 
-    case Nat        => tm
-    case Z          => tm
-    case S(n)       => S(zonk(n))
-    case FoldNat(t) => FoldNat(zonk(t))
-
     case Bool           => tm
     case True           => tm
     case False          => tm

@@ -22,7 +22,6 @@ object Value:
     case SId
     case SApp(spine: Spine, arg: Val, icit: Icit)
     case SSplice(spine: Spine)
-    case SFoldNat(spine: Spine, ty: VTy, z: Val, s: Val)
     case SProj(spine: Spine, proj: ProjType)
     case SIf(spine: Spine, ty: VTy, ifTrue: Val, ifFalse: Val)
     case SBinop(left: Spine, op: Op, right: Val)
@@ -53,10 +52,6 @@ object Value:
 
     case VLift(vf: VTy, tm: VTy)
     case VQuote(tm: Val)
-
-    case VNat
-    case VZ
-    case VS(n: VTy)
 
     case VBool
     case VTrue

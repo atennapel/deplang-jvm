@@ -49,26 +49,13 @@ object Simplifier:
         Some(Let(y, t, v, App(b.subst(Map(x -> Local(y, t)), scope), a)))
       else Some(Let(x, t, v, App(b, a)))
     case App(Lam(x, t1, t2, b), a) => Some(Let(x, TDef(t1), a, b))
-    case App(App(App(FoldNat(t), n), z), s) if n.toInt.isDefined =>
-      var m = n.toInt.get
-      var c: Tm = z
-      var k: Tm = Z
-      while (m > 0) do
-        m -= 1
-        c = App(App(s, k), c)
-        k = S(k)
-      Some(c)
-    case App(f, a) => go2(f, a).map(App.apply)
+    case App(f, a)                 => go2(f, a).map(App.apply)
 
     case Pair(t1, t2, fst, snd)     => go2(fst, snd).map(Pair(t1, t2, _, _))
     case Fst(_, Pair(_, _, fst, _)) => Some(fst)
     case Snd(_, Pair(_, _, _, snd)) => Some(snd)
     case Fst(ty, t)                 => go(t).map(Fst(ty, _))
     case Snd(ty, t)                 => go(t).map(Snd(ty, _))
-
-    case Z          => None
-    case S(n)       => go(n).map(S.apply)
-    case FoldNat(t) => None
 
     case True  => None
     case False => None

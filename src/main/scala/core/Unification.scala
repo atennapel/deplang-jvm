@@ -30,15 +30,9 @@ object Unification:
 
   private def rename(m: MetaId, v: Val)(implicit pren: PRen): Tm =
     def goSp(hd: Tm, sp: Spine)(implicit pren: PRen): Tm = sp match
-      case SId            => hd
-      case SApp(sp, a, i) => App(goSp(hd, sp), go(a), i)
-      case SSplice(sp)    => Splice(goSp(hd, sp))
-      case SFoldNat(sp, t, z, s) =>
-        App(
-          App(App(FoldNat(go(t)), goSp(hd, sp), Expl), go(z), Expl),
-          go(s),
-          Expl
-        )
+      case SId              => hd
+      case SApp(sp, a, i)   => App(goSp(hd, sp), go(a), i)
+      case SSplice(sp)      => Splice(goSp(hd, sp))
       case SProj(sp, p)     => Proj(goSp(hd, sp), p)
       case SIf(sp, t, a, b) => If(go(t), goSp(hd, sp), go(a), go(b))
       case SBinop(a, op, b) => Binop(op, goSp(hd, a), go(b))
@@ -94,10 +88,6 @@ object Unification:
       case VLift(vf, v) => Lift(go(vf), go(v))
       case VQuote(v)    => Quote(go(v))
 
-      case VNat  => Nat
-      case VZ    => Z
-      case VS(n) => S(go(n))
-
       case VBool  => Bool
       case VTrue  => True
       case VFalse => False
@@ -135,8 +125,6 @@ object Unification:
     case (SId, SId)                           => ()
     case (SApp(sp1, a1, _), SApp(sp2, a2, _)) => unify(sp1, sp2); unify(a1, a2)
     case (SSplice(sp1), SSplice(sp2))         => unify(sp1, sp2)
-    case (SFoldNat(sp1, t1, z1, s1), SFoldNat(sp2, t2, z2, s2)) =>
-      unify(sp1, sp2); unify(t1, t2); unify(z1, z2); unify(s1, s2)
     case (SProj(s1, p1), SProj(s2, p2)) if p1 == p2 => unify(s1, s2)
     case (SProj(s1, Fst), SProj(s2, Named(_, n)))   => unifyProj(s1, s2, n)
     case (SProj(s1, Named(_, n)), SProj(s2, Fst))   => unifyProj(s2, s1, n)
@@ -154,9 +142,6 @@ object Unification:
       case (VVFVal, VVFVal)                   => ()
       case (VVFFun, VVFFun)                   => ()
       case (VU1, VU1)                         => ()
-      case (VNat, VNat)                       => ()
-      case (VZ, VZ)                           => ()
-      case (VS(n), VS(m))                     => unify(n, m)
       case (VBool, VBool)                     => ()
       case (VTrue, VTrue)                     => ()
       case (VFalse, VFalse)                   => ()

@@ -4,13 +4,11 @@ import common.Common.*
 
 object Syntax:
   enum Ty:
-    case TNat
     case TBool
     case TInt
     case TPair(fst: Ty, snd: Ty)
 
     override def toString: String = this match
-      case TNat            => "Nat"
       case TBool           => "Bool"
       case TInt            => "Int"
       case TPair(fst, snd) => s"($fst ** $snd)"
@@ -37,10 +35,6 @@ object Syntax:
     case Fst(ty: Ty, tm: Tm)
     case Snd(ty: Ty, tm: Tm)
 
-    case Z
-    case S(n: Tm)
-    case FoldNat(ty: Ty)
-
     case True
     case False
     case If(ty: TDef, cond: Tm, ifTrue: Tm, ifFalse: Tm)
@@ -61,10 +55,6 @@ object Syntax:
       case Pair(_, _, fst, snd) => s"($fst, $snd)"
       case Fst(_, t)            => s"(fst $t)"
       case Snd(_, t)            => s"(snd $t)"
-
-      case Z          => "Z"
-      case S(n)       => s"(S $n)"
-      case FoldNat(t) => s"(foldNat {$t})"
 
       case True           => "True"
       case False          => "False"
@@ -107,8 +97,6 @@ object Syntax:
       case Pair(_, _, fst, snd) => fst.freeVars ++ snd.freeVars
       case Fst(_, t)            => t.freeVars
       case Snd(_, t)            => t.freeVars
-
-      case S(n) => n.freeVars
 
       case If(_, c, a, b) => c.freeVars ++ a.freeVars ++ b.freeVars
 
@@ -184,8 +172,6 @@ object Syntax:
       case Fst(ty, tm) => Fst(ty, tm.subst(sub, scope))
       case Snd(ty, tm) => Snd(ty, tm.subst(sub, scope))
 
-      case S(n: Tm) => S(n.subst(sub, scope))
-
       case If(t, c, a, b) =>
         If(t, c.subst(sub, scope), a.subst(sub, scope), b.subst(sub, scope))
 
@@ -193,11 +179,6 @@ object Syntax:
         Binop(op, a.subst(sub, scope), b.subst(sub, scope))
 
       case _ => this
-
-    def toInt: Option[Int] = this match
-      case Z    => Some(0)
-      case S(n) => n.toInt.map(_ + 1)
-      case _    => None
   export Tm.*
 
   final case class Defs(defs: List[Def]):

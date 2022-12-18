@@ -2,7 +2,7 @@ package surface
 
 import common.Common.*
 import common.Debug.*
-import core.Syntax.{S as NatS, *}
+import core.Syntax.*
 import core.Value.*
 import core.Evaluation.*
 import core.Unification.{unify as unify0, UnifyError}
@@ -313,24 +313,6 @@ object Elaboration:
       case S.Var(Name("False")) => (False, VBool, VUVal())
       case S.Var(Name("Int"))   => (IntTy, VUVal(), VU1)
       case S.IntLit(n)          => (IntLit(n), VInt, VUVal())
-      case S.Var(Name("Nat"))   => (Nat, VUVal(), VU1)
-      case S.Var(Name("Z"))     => (Z, VNat, VUVal())
-      case S.App(S.Var(Name("S")), n, Expl) =>
-        val en = check(n, VNat, VUVal())
-        (NatS(en), VNat, VUVal())
-      case S.Var(Name("S")) =>
-        val sty = vpi("_", VNat, VUVal(), VUVal(), _ => VNat)
-        (
-          Let(
-            Name("s"),
-            ctx.quote(VUFun()),
-            ctx.quote(sty),
-            Lam(DoBind(Name("x")), Expl, NatS(Local(ix0))),
-            Local(ix0)
-          ),
-          sty,
-          VUFun()
-        )
       case S.App(S.App(S.Var(Name("+")), a, Expl), b, Expl) =>
         val ea = check(a, VInt, VUVal()); val eb = check(b, VInt, VUVal())
         (Binop(OAdd, ea, eb), VInt, VUVal())
@@ -364,38 +346,6 @@ object Elaboration:
       case S.App(S.App(S.Var(Name(">=")), a, Expl), b, Expl) =>
         val ea = check(a, VInt, VUVal()); val eb = check(b, VInt, VUVal())
         (Binop(OGeq, ea, eb), VBool, VUVal())
-      /*
-      n : Nat
-      z : A
-      s : Nat -> A -> A
-      --------------------------------------
-      foldNat n z s ~> foldNat {A} n z s : A
-       */
-      case S.App(
-            S.App(S.App(S.Var(Name("foldNat")), n, Expl), z, Expl),
-            s,
-            Expl
-          ) =>
-        val en = check(n, VNat, VUVal())
-        val (ez, vt) = infer(z, VUVal())
-        val es = check(
-          s,
-          vpi(
-            "_",
-            VNat,
-            VUVal(),
-            VUFun(),
-            _ => vpi("_", vt, VUVal(), VUVal(), _ => vt)
-          ),
-          VUFun()
-        )
-        (
-          App(App(App(FoldNat(ctx.quote(vt)), en, Expl), ez, Expl), es, Expl),
-          vt,
-          VUVal()
-        )
-      case S.Var(Name("foldNat")) =>
-        throw ElaborateError(s"foldNat must be fully applied")
       case S.Var(x) =>
         ctx.lookup(x) match
           case Some((ix, ty, st)) => (Local(ix), ty, st)

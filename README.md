@@ -41,7 +41,7 @@ TODO:
 - [x] Allow if to return lambdas
 - [x] Fixpoint
 - [x] Add Int and primitive binops
-- [ ] Remove Nat
+- [x] Remove Nat
 - [ ] Tail recursion
 - [ ] Datatypes
 - [ ] More simplification: case-of-case, app and case commutation

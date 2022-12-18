@@ -48,17 +48,6 @@ object Evaluation:
     case VGlobal(x, sp, v)  => VGlobal(x, SSplice(sp), () => vsplice(v()))
     case _                  => impossible()
 
-  def vfoldnat(t: VTy, n: Val, z: Val, s: Val): Val = n match
-    case VZ => z
-    // foldNat {t} (S n) z s ~> s n (foldNat {t} n z s)
-    case VS(n) => vapp(vapp(s, n, Expl), vfoldnat(t, n, z, s), Expl)
-    case VFix(go, x, b, sp) => VFix(go, x, b, SFoldNat(sp, t, z, s))
-    case VRigid(hd, sp)     => VRigid(hd, SFoldNat(sp, t, z, s))
-    case VFlex(hd, sp)      => VFlex(hd, SFoldNat(sp, t, z, s))
-    case VGlobal(x, sp, v) =>
-      VGlobal(x, SFoldNat(sp, t, z, s), () => vfoldnat(t, v(), z, s))
-    case _ => impossible()
-
   def vproj(tm: Val, proj: ProjType): Val = tm match
     case VPair(fst, snd) =>
       proj match
@@ -116,13 +105,12 @@ object Evaluation:
     case _ => impossible()
 
   def vspine(v: Val, sp: Spine): Val = sp match
-    case SId                   => v
-    case SApp(sp, a, i)        => vapp(vspine(v, sp), a, i)
-    case SSplice(sp)           => vsplice(vspine(v, sp))
-    case SFoldNat(sp, t, z, s) => vfoldnat(t, vspine(v, sp), z, s)
-    case SProj(sp, p)          => vproj(vspine(v, sp), p)
-    case SIf(sp, t, a, b)      => vif(vspine(v, sp), t, a, b)
-    case SBinop(a, op, b)      => vbinop(op, vspine(v, sp), b)
+    case SId              => v
+    case SApp(sp, a, i)   => vapp(vspine(v, sp), a, i)
+    case SSplice(sp)      => vsplice(vspine(v, sp))
+    case SProj(sp, p)     => vproj(vspine(v, sp), p)
+    case SIf(sp, t, a, b) => vif(vspine(v, sp), t, a, b)
+    case SBinop(a, op, b) => vbinop(op, vspine(v, sp), b)
 
   def vmeta(id: MetaId): Val = getMeta(id) match
     case Unsolved     => VMeta(id)
@@ -167,12 +155,6 @@ object Evaluation:
 
     case Wk(t) => eval(t)(env.tail)
 
-    case Nat  => VNat
-    case Z    => VZ
-    case S(n) => VS(eval(n))
-    case FoldNat(t) =>
-      vlam("n", n => vlam("z", z => vlam("s", s => vfoldnat(eval(t), n, z, s))))
-
     case Bool           => VBool
     case True           => VTrue
     case False          => VFalse
@@ -204,17 +186,7 @@ object Evaluation:
       case SId            => hd
       case SApp(sp, a, i) => App(quote(hd, sp, unfold), quote(a, unfold), i)
       case SSplice(sp)    => Splice(quote(hd, sp, unfold))
-      case SFoldNat(sp, t, z, s) =>
-        App(
-          App(
-            App(FoldNat(quote(t, unfold)), quote(hd, sp, unfold), Expl),
-            quote(z, unfold),
-            Expl
-          ),
-          quote(s, unfold),
-          Expl
-        )
-      case SProj(sp, p) => Proj(quote(hd, sp, unfold), p)
+      case SProj(sp, p)   => Proj(quote(hd, sp, unfold), p)
       case SIf(sp, t, a, b) =>
         If(
           quote(t, unfold),
@@ -272,10 +244,6 @@ object Evaluation:
 
       case VLift(vf, v) => Lift(quote(vf, unfold), quote(v, unfold))
       case VQuote(v)    => Quote(quote(v, unfold))
-
-      case VNat  => Nat
-      case VZ    => Z
-      case VS(n) => S(quote(n, unfold))
 
       case VBool  => Bool
       case VTrue  => True
