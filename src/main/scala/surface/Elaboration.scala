@@ -195,12 +195,6 @@ object Elaboration:
       case (S.Lam(x, i1, b), VPi(_, i2, t, u1, rt, u2)) if i1 == i2 =>
         val eb = check(b, rt(VVar(ctx.lvl)), u2)(ctx.bind(x, t, u1))
         Lam(x, i1, eb)
-      case (S.Fix(go, x, b), VPi(_, Expl, t, u1, rt, u2)) =>
-        unify(u1, VUVal())
-        val eb = check(b, rt(VVar(ctx.lvl + 1)), u2)(
-          ctx.bind(DoBind(go), ty, VUFun()).bind(DoBind(x), t, VUVal())
-        )
-        Fix(go, x, eb)
       case (tm, VPi(x, Impl, t, u1, rt, u2)) =>
         val etm = check(tm, rt(VVar(ctx.lvl)), u2)(ctx.bind(x, t, u1, true))
         Lam(x, Impl, etm)
@@ -252,6 +246,17 @@ object Elaboration:
           case VUFun() =>
           case _ => throw ElaborateError(s"if should return in U0 Val: $tm")
         If(ctx.quote(ty), ec, et, ef)
+
+      case (S.Fix(go, x, b, a), _) =>
+        val vf = force(univ) match
+          case VU(vf) => vf
+          case _      => throw ElaborateError(s"fix has to return in U0")
+        val (ea, vt) = infer(a, VUVal())
+        val fun = vpi("_", vt, VUVal(), univ, _ => ty)
+        val eb = check(b, ty, univ)(
+          ctx.bind(DoBind(go), fun, VUFun()).bind(DoBind(x), vt, VUVal())
+        )
+        Fix(go, x, eb, ea)
 
       case (tm, _) =>
         val (etm, ty2, univ2) = insert(infer(tm))
@@ -461,6 +466,16 @@ object Elaboration:
         val ty = ctx.eval(newMeta())
         val tm = newMeta()
         (tm, ty, u)
+      case S.Fix(go, x, b, a) =>
+        val (ea, vt) = infer(a, VUVal())
+        val vf = ctx.eval(newMeta())
+        val u = VU(vf)
+        val rt = ctx.eval(newMeta())
+        val fun = vpi("_", vt, VUVal(), u, _ => rt)
+        val eb = check(b, rt, u)(
+          ctx.bind(DoBind(go), fun, VUFun()).bind(DoBind(x), vt, VUVal())
+        )
+        (Fix(go, x, eb, ea), rt, u)
       case _ => throw ElaborateError(s"cannot infer $tm")
 
   private def elaborate(tm: S.Tm, ty: Option[S.Ty], u: VTy): (Tm, Ty) =

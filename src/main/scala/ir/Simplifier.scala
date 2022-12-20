@@ -40,8 +40,13 @@ object Simplifier:
 
     case Lam(x, t1, t2, b) => go(b)(scope + x).map(b => Lam(x, t1, t2, b))
 
-    case Fix(g, x, t1, t2, b) =>
-      go(b)(scope + g + x).map(b => Fix(g, x, t1, t2, b))
+    case Fix(g, x, t1, t2, b, arg) =>
+      go(arg) match
+        case Some(arg) =>
+          go(b)(scope + g + x) match
+            case Some(b) => Some(Fix(g, x, t1, t2, b, arg))
+            case None    => Some(Fix(g, x, t1, t2, b, arg))
+        case None => go(b)(scope + g + x).map(b => Fix(g, x, t1, t2, b, arg))
 
     case App(Let(x, t, v, b), a) =>
       if scope.contains(x) then

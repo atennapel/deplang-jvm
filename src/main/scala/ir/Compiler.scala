@@ -66,9 +66,9 @@ object Compiler:
         val g = lambdaLift(uniq.updateGetOld(_ + 1), TDef(t1, t2), t)
         go(g)
 
-      case Fix(g, x, t1, t2, b) =>
+      case Fix(g, x, t1, t2, b, arg) =>
         val glb = fixLift(uniq.updateGetOld(_ + 1), g, x, t1, t2, b)
-        go(glb) // TODO: needs to be wrapped in lambda
+        go(App(glb, arg))
 
       case App(f0, a) =>
         val (f, as) = t.flattenApps
@@ -76,9 +76,9 @@ object Compiler:
           case Global(x, t) =>
             if t.params.size != as.size then impossible()
             IR.Global(norm(x), go(t), as.map(go))
-          case Fix(g, x, t1, t2, b) =>
+          case Fix(g, x, t1, t2, b, arg) =>
             val glb = fixLift(uniq.updateGetOld(_ + 1), g, x, t1, t2, b)
-            go(glb.apps(as))
+            go(glb.apps(arg :: as))
           case _ => impossible()
 
       case Pair(t1, t2, fst, snd) => IR.Pair(box(t1, go(fst)), box(t2, go(snd)))

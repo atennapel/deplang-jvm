@@ -90,10 +90,10 @@ object Pretty:
     case Pi(_, _, _, _, _, _) => prettyPi(tm)
     case Lam(_, _, _)         => prettyLam(tm)
     case App(_, _, _)         => prettyApp(tm)
-    case Fix(go0, x0, b) =>
+    case Fix(go0, x0, b, arg) =>
       val go = go0.fresh
       val x = x0.fresh(go :: ns)
-      s"fix $go $x. ${pretty(b)(x :: go :: ns)}"
+      s"fix ($go $x. ${pretty(b)(x :: go :: ns)}) ${prettyParen(arg)}"
 
     case Sigma(_, _, _, _, _) => prettySigma(tm)
     case Proj(tm, proj)       => s"${prettyParen(tm)}$proj"

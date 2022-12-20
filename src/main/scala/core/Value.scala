@@ -25,6 +25,7 @@ object Value:
     case SProj(spine: Spine, proj: ProjType)
     case SIf(spine: Spine, ty: VTy, ifTrue: Val, ifFalse: Val)
     case SBinop(left: Spine, op: Op, right: Val)
+    case SFix(go: Name, name: Name, body: Clos2, arg: Spine)
   export Spine.*
 
   enum Head:
@@ -37,7 +38,6 @@ object Value:
     case VRigid(head: Head, spine: Spine)
     case VFlex(id: MetaId, spine: Spine)
     case VGlobal(name: Name, spine: Spine, value: () => Val)
-    case VFix(go: Name, name: Name, body: Clos2, spine: Spine)
 
     case VVF
     case VVFVal

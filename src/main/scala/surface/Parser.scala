@@ -175,9 +175,12 @@ object Parser:
         bind.map(x => (x, Expl))
 
     private lazy val fix: Parsley[Tm] =
-      positioned(("fix" *> identOrOp <~> identOrOp <~> "." *> tm).map {
-        case ((go, x), b) => Fix(go, x, b)
-      })
+      positioned(
+        ("fix" *> "(" *> identOrOp <~> identOrOp <~> "." *> tm <~> ")" *> atom)
+          .map { case (((go, x), b), a) =>
+            Fix(go, x, b, a)
+          }
+      )
 
     private lazy val app: Parsley[Tm] =
       precedence[Tm](appAtom)(

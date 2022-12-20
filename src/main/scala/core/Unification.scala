@@ -36,6 +36,13 @@ object Unification:
       case SProj(sp, p)     => Proj(goSp(hd, sp), p)
       case SIf(sp, t, a, b) => If(go(t), goSp(hd, sp), go(a), go(b))
       case SBinop(a, op, b) => Binop(op, goSp(hd, a), go(b))
+      case SFix(g, x, b, sp) =>
+        Fix(
+          g,
+          x,
+          go(b(VVar(pren.cod), VVar(pren.cod + 1)))(pren.lift.lift),
+          goSp(hd, sp)
+        )
 
     def goCl(c: Clos)(implicit pren: PRen): Tm =
       go(c(VVar(pren.cod)))(pren.lift)
@@ -69,11 +76,6 @@ object Unification:
           go(u2)
         )
       case VLam(x, i, b) => Lam(x, i, goCl(b))
-      case VFix(g, x, b, sp) =>
-        goSp(
-          Fix(g, x, go(b(VVar(pren.cod), VVar(pren.cod + 1)))(pren.lift.lift)),
-          sp
-        )
 
       case VSigma(x, t, u1, b, u2) =>
         Sigma(
@@ -130,6 +132,12 @@ object Unification:
     case (SProj(s1, Named(_, n)), SProj(s2, Fst))   => unifyProj(s2, s1, n)
     case (SIf(sp1, t1, a1, b1), SIf(sp2, t2, a2, b2)) =>
       unify(sp1, sp2); unify(t1, t2); unify(a1, a2); unify(b1, b2)
+    case (SBinop(a1, op1, b1), SBinop(a2, op2, b2)) if op1 == op2 =>
+      unify(a1, a2); unify(b1, b2)
+    case (SFix(_, _, b1, sp1), SFix(_, _, b2, sp2)) =>
+      unify(sp1, sp2)
+      val v = VVar(k); val w = VVar(k + 1)
+      unify(b1(v, w), b2(v, w))(k + 2)
     case _ => throw UnifyError("spine mismatch")
 
   private def unify(a: Clos, b: Clos)(implicit k: Lvl): Unit =
@@ -155,11 +163,6 @@ object Unification:
         unify(t1, t2); unify(u11, u21); unify(b1, b2); unify(u12, u22)
       case (VPair(a1, b1), VPair(a2, b2)) => unify(a1, a2); unify(b1, b2)
       case (VRigid(h1, sp1), VRigid(h2, sp2)) if h1 == h2 => unify(sp1, sp2)
-
-      case (VFix(_, _, b1, sp1), VFix(_, _, b2, sp2)) =>
-        val v = VVar(k); val w = VVar(k + 1)
-        unify(b1(v, w), b2(v, w))(k + 2)
-        unify(sp1, sp2)
 
       case (VLam(_, i1, b1), VLam(_, i2, b2)) if i1 == i2 => unify(b1, b2)
       case (VLam(_, i, b), f) =>

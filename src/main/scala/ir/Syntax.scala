@@ -28,7 +28,7 @@ object Syntax:
     case Let(name: Int, ty: TDef, value: Tm, body: Tm)
 
     case Lam(name: Int, t1: Ty, t2: TDef, body: Tm)
-    case Fix(go: Int, name: Int, t1: Ty, t2: TDef, body: Tm)
+    case Fix(go: Int, name: Int, t1: Ty, t2: TDef, body: Tm, arg: Tm)
     case App(fn: Tm, arg: Tm)
 
     case Pair(t1: Ty, t2: Ty, fst: Tm, snd: Tm)
@@ -48,9 +48,9 @@ object Syntax:
       case Let(x, t, v, b) =>
         s"(let '$x : $t = $v in $b)"
 
-      case Lam(x, _, _, b)     => s"(\\'$x. $b)"
-      case Fix(go, x, _, _, b) => s"(fix '$go '$x. $b)"
-      case App(f, a)           => s"($f $a)"
+      case Lam(x, _, _, b)          => s"(\\'$x. $b)"
+      case Fix(go, x, _, _, b, arg) => s"(fix ('$go '$x. $b) $arg)"
+      case App(f, a)                => s"($f $a)"
 
       case Pair(_, _, fst, snd) => s"($fst, $snd)"
       case Fst(_, t)            => s"(fst $t)"
@@ -90,8 +90,8 @@ object Syntax:
         v.freeVars ++ b.freeVars.filterNot((y, _) => x == y)
 
       case Lam(x, _, _, b) => b.freeVars.filterNot((y, _) => x == y)
-      case Fix(go, x, _, _, b) =>
-        b.freeVars.filterNot((y, _) => x == y || go == y)
+      case Fix(go, x, _, _, b, arg) =>
+        b.freeVars.filterNot((y, _) => x == y || go == y) ++ arg.freeVars
       case App(f, a) => f.freeVars ++ a.freeVars
 
       case Pair(_, _, fst, snd) => fst.freeVars ++ snd.freeVars
@@ -127,9 +127,18 @@ object Syntax:
         Lam(y, t1, t2, b.subst(sub + (x -> Local(y, TDef(t1))), scope + y))
       case App(f, a) => App(f.subst(sub, scope), a.subst(sub, scope))
 
-      case Fix(go, x, t1, t2, b) if !scope.contains(go) && !scope.contains(x) =>
-        Fix(go, x, t1, t2, b.subst(sub - go - x, scope + go + x))
-      case Fix(go, x, t1, t2, b) if scope.contains(go) && !scope.contains(x) =>
+      case Fix(go, x, t1, t2, b, arg)
+          if !scope.contains(go) && !scope.contains(x) =>
+        Fix(
+          go,
+          x,
+          t1,
+          t2,
+          b.subst(sub - go - x, scope + go + x),
+          arg.subst(sub, scope)
+        )
+      case Fix(go, x, t1, t2, b, arg)
+          if scope.contains(go) && !scope.contains(x) =>
         val go2 = scope.max + 1
         Fix(
           go2,
@@ -139,9 +148,11 @@ object Syntax:
           b.subst(
             sub + (go -> Local(go2, TDef(t1, t2))),
             scope + go2
-          )
+          ),
+          arg.subst(sub, scope)
         )
-      case Fix(go, x, t1, t2, b) if !scope.contains(go) && scope.contains(x) =>
+      case Fix(go, x, t1, t2, b, arg)
+          if !scope.contains(go) && scope.contains(x) =>
         val x2 = scope.max + 1
         Fix(
           go,
@@ -151,9 +162,10 @@ object Syntax:
           b.subst(
             sub + (x -> Local(x2, TDef(t1))),
             scope + x2
-          )
+          ),
+          arg.subst(sub, scope)
         )
-      case Fix(go, x, t1, t2, b) =>
+      case Fix(go, x, t1, t2, b, arg) =>
         val go2 = scope.max + 1
         val x2 = (scope + go2).max + 1
         Fix(
@@ -164,7 +176,8 @@ object Syntax:
           b.subst(
             sub + (go -> Local(go2, TDef(t1, t2))) + (x -> Local(x2, TDef(t1))),
             scope + go2 + x2
-          )
+          ),
+          arg.subst(sub, scope)
         )
 
       case Pair(t1, t2, fst, snd) =>
