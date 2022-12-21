@@ -125,6 +125,8 @@ object Pretty:
     case Con(x, _, Nil) => s"$x"
     case Con(x, _, as) =>
       s"$x ${as.map((t, _, _) => prettyParen(t)).mkString(" ")}"
+    case Case(x, _, _, cs) =>
+      s"case ${prettyParen(x)} | ${cs.map((c, b) => s"$c => ${pretty(b)}").mkString(" | ")}"
 
     case Meta(id)            => s"?$id"
     case InsertedMeta(id, _) => s"?$id"

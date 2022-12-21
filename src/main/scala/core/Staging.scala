@@ -59,6 +59,7 @@ object Staging:
     case VIntLit0(value: Int)
     case VBinop0(op: Op, left: Val0, right: Val0)
     case VCon0(name: Name, ty: Val1, args: List[(Val0, Val1, Boolean)])
+    case VCase0(scrut: Val0, ty: Val1, vf: Val1, cs: List[(Name, Val0)])
   import Val0.*
 
   private def vvar1(ix: Ix)(implicit env: Env): Val1 =
@@ -167,6 +168,14 @@ object Staging:
     case Con(x, t, as) =>
       VCon0(x, eval1(t), as.map((a, b, p) => (eval0(a), eval1(b), p)))
 
+    case Case(scrut, ty, vf, cs) =>
+      VCase0(
+        eval0(scrut),
+        eval1(ty),
+        eval1(vf),
+        cs.map((x, b) => (x, eval0(b)))
+      )
+
     case _ => impossible()
 
   // staging
@@ -191,6 +200,7 @@ object Staging:
     case Binop(op: Op, left: Tmp, right: Tmp)
 
     case Con(name: Name, ty: IR.Ty, args: List[(Tmp, IR.Ty, Boolean)])
+    case Case(scrut: Tmp, ty: IR.TDef, cases: List[(Name, Tmp)])
 
   private def quote0ir(v: Val0)(implicit k: Lvl): Tmp =
     // debug(s"quote0ir $v")
@@ -229,6 +239,12 @@ object Staging:
           x,
           quote1ty(t),
           as.map((a, b, p) => (quote0ir(a), quote1ty(b), p))
+        )
+      case VCase0(scrut, ty, _, cs) =>
+        Tmp.Case(
+          quote0ir(scrut),
+          quote1tdefOrTy(ty),
+          cs.map((x, b) => (x, quote0ir(b)))
         )
       case _ => impossible()
 
@@ -398,6 +414,11 @@ object Staging:
         (ea, ty, p)
       })
       (IR.Con(x, t, eas), IR.TDef(t))
+
+    case Tmp.Case(scrut, ty, cs) =>
+      val (escrut, scrutty) = infer(scrut)
+      val ecs = cs.map((c, b) => (c, check(b, ty)))
+      (IR.Case(escrut, ty, ecs), ty)
 
     case _ => impossible()
 

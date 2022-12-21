@@ -33,6 +33,7 @@ object Syntax:
     case Splice(tm: Tm)
 
     case If(cond: Tm, ifTrue: Tm, ifFalse: Tm)
+    case Case(scrut: Tm, cases: List[(Name, Tm)])
 
     case IntLit(value: Int)
 
@@ -76,6 +77,8 @@ object Syntax:
       case Pair(fst, snd)         => s"($fst, $snd)"
 
       case If(c, a, b) => s"(if $c then $a else $b)"
+      case Case(x, cs) =>
+        s"(case $x | ${cs.map((c, b) => s"$c => $b").mkString(" | ")})"
 
       case IntLit(n) => s"$n"
 
@@ -106,6 +109,7 @@ object Syntax:
       case Pair(fst, snd) => Pair(fst.removePos, snd.removePos)
 
       case If(c, a, b) => If(c.removePos, a.removePos, b.removePos)
+      case Case(c, cs) => Case(c.removePos, cs.map((x, t) => (x, t.removePos)))
 
       case Pos(_, t) => t.removePos
 

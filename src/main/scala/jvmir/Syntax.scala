@@ -43,6 +43,7 @@ object Syntax:
     case Binop(op: Op, left: Tm, right: Tm)
 
     case Con(name: Name, ty: Ty, args: List[(Tm, Ty, Boolean)])
+    case Case(scrut: Tm, ty: Ty, cases: List[(Name, Tm)])
 
     case Box(ty: Ty, tm: Tm)
     case Unbox(ty: Ty, tm: Tm)
@@ -69,6 +70,9 @@ object Syntax:
 
       case Con(x, _, Nil) => s"$x"
       case Con(x, _, as)  => s"($x ${as.map(_._1).mkString(" ")})"
+
+      case Case(x, _, cs) =>
+        s"(case $x | ${cs.map((c, b) => s"$c => $b").mkString(" | ")})"
 
       case Box(ty, tm)   => s"(box {$ty} $tm)"
       case Unbox(ty, tm) => s"(unbox {$ty} $tm)"

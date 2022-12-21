@@ -55,6 +55,7 @@ object Syntax:
 
     case TCon(name: Name, args: List[Tm])
     case Con(name: Name, ty: Ty, args: List[(Tm, Ty, Boolean)])
+    case Case(scrut: Tm, ty: Ty, vf: Ty, cases: List[(Name, Tm)])
 
     case Meta(id: MetaId)
     case InsertedMeta(id: MetaId, bds: BDs)
@@ -108,6 +109,8 @@ object Syntax:
 
       case TCon(x, Nil) => s"$x"
       case TCon(x, as)  => s"($x ${as.mkString(" ")})"
+      case Case(x, _, _, cs) =>
+        s"(case $x | ${cs.map((c, b) => s"$c => $b").mkString(" | ")})"
 
       case Con(x, _, Nil) => s"$x"
       case Con(x, _, as)  => s"($x ${as.map(_._1).mkString(" ")})"

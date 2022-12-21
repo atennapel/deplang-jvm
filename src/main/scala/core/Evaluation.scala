@@ -95,16 +95,27 @@ object Evaluation:
     case VFlex(hd, sp)  => VFlex(hd, SFix(go, x, body, sp))
     case VGlobal(x, sp, v) =>
       VGlobal(x, SFix(go, x, body, sp), () => vfix(go, x, body, v()))
-    case _ => impossible()
+    case v =>
+      body(VLam(DoBind(Name("x")), Expl, CFun(a => vfix(go, x, body, a))), v)
+
+  def vcase(scrut: Val, ty: VTy, vf: VTy, cs: List[(Name, Val)]): Val =
+    scrut match
+      case VCon(x, _, _)  => cs.find((y, b) => y == x).get._2
+      case VRigid(hd, sp) => VRigid(hd, SCase(sp, ty, vf, cs))
+      case VFlex(hd, sp)  => VFlex(hd, SCase(sp, ty, vf, cs))
+      case VGlobal(x, sp, v) =>
+        VGlobal(x, SCase(sp, ty, vf, cs), () => vcase(v(), ty, vf, cs))
+      case _ => impossible()
 
   def vspine(v: Val, sp: Spine): Val = sp match
-    case SId                => v
-    case SApp(sp, a, i)     => vapp(vspine(v, sp), a, i)
-    case SSplice(sp)        => vsplice(vspine(v, sp))
-    case SProj(sp, p)       => vproj(vspine(v, sp), p)
-    case SIf(sp, t, a, b)   => vif(vspine(v, sp), t, a, b)
-    case SBinop(a, op, b)   => vbinop(op, vspine(v, sp), b)
-    case SFix(go, x, b, sp) => vfix(go, x, b, vspine(v, sp))
+    case SId                  => v
+    case SApp(sp, a, i)       => vapp(vspine(v, sp), a, i)
+    case SSplice(sp)          => vsplice(vspine(v, sp))
+    case SProj(sp, p)         => vproj(vspine(v, sp), p)
+    case SIf(sp, t, a, b)     => vif(vspine(v, sp), t, a, b)
+    case SBinop(a, op, b)     => vbinop(op, vspine(v, sp), b)
+    case SFix(go, x, b, sp)   => vfix(go, x, b, vspine(v, sp))
+    case SCase(sp, t, vf, cs) => vcase(vspine(v, sp), t, vf, cs)
 
   def vmeta(id: MetaId): Val = getMeta(id) match
     case Unsolved     => VMeta(id)
@@ -161,6 +172,8 @@ object Evaluation:
     case TCon(x, as) => VTCon(x, as.map(eval))
     case Con(x, t, as) =>
       VCon(x, eval(t), as.map((a, b, p) => (eval(a), eval(b), p)))
+    case Case(scrut, t, vf, cs) =>
+      vcase(eval(scrut), eval(t), eval(vf), cs.map((y, b) => (y, eval(b))))
 
     case Meta(id)              => vmeta(id)
     case InsertedMeta(id, bds) => vappbds(vmeta(id), bds)
@@ -199,6 +212,13 @@ object Evaluation:
           x,
           quote(b(VVar(k), VVar(k + 1)), unfold)(k + 2),
           quote(hd, v, unfold)
+        )
+      case SCase(scrut, t, vf, cs) =>
+        Case(
+          quote(hd, scrut, unfold),
+          quote(t, unfold),
+          quote(vf, unfold),
+          cs.map((x, b) => (x, quote(b, unfold)))
         )
 
   private def quote(b: Clos, unfold: Unfold)(implicit k: Lvl): Tm =

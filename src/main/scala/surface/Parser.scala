@@ -44,7 +44,9 @@ object Parser:
         "^",
         "`",
         "$",
-        "_"
+        "_",
+        "|",
+        "=>"
       ),
       identStart = Predicate(_.isLetter),
       identLetter =
@@ -111,7 +113,7 @@ object Parser:
     private val hole = Hole(None)
 
     lazy val tm: Parsley[Tm] = positioned(
-      attempt(piSigma) <|> ifP <|> let <|> lam <|> fix <|>
+      attempt(piSigma) <|> ifP <|> caseP <|> let <|> lam <|> fix <|>
         precedence[Tm](app)(
           Ops(InfixR)("**" #> ((l, r) => Sigma(DontBind, l, r))),
           Ops(InfixR)("->" #> ((l, r) => Pi(DontBind, Expl, l, r)))
@@ -162,6 +164,13 @@ object Parser:
       positioned(
         ("if" *> tm <~> "then" *> tm <~> "else" *> tm)
           .map { case ((c, t), f) => If(c, t, f) }
+      )
+
+    private lazy val caseP: Parsley[Tm] =
+      positioned(
+        ("case" *> tm <~> many("|" *> identOrOp <~> "=>" *> tm)).map(
+          (scrut, cs) => Case(scrut, cs)
+        )
       )
 
     private lazy val lam: Parsley[Tm] =

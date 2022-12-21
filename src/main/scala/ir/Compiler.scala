@@ -76,7 +76,7 @@ object Compiler:
 
       case Fix(g, x, t1, t2, b, arg) =>
         val glb = fixLift(uniq.updateGetOld(_ + 1), g, x, t1, t2, b)
-        go(App(glb, arg), true)
+        go(App(glb, arg), tr)
 
       case App(f0, a) =>
         val (f, as) = t.flattenApps
@@ -91,7 +91,7 @@ object Compiler:
             )
           case Fix(g, x, t1, t2, b, arg) =>
             val glb = fixLift(uniq.updateGetOld(_ + 1), g, x, t1, t2, b)
-            go(glb.apps(arg :: as), true)
+            go(glb.apps(arg :: as), tr)
           case _ => impossible()
 
       case Pair(t1, t2, fst, snd) =>
@@ -106,7 +106,7 @@ object Compiler:
       case Binop(op, a, b) => IR.Binop(op, go(a, false), go(b, false))
 
       case If(TDef(Nil, t), c, a, b) =>
-        IR.If(go(t), go(c, false), go(a, true), go(b, true))
+        IR.If(go(t), go(c, false), go(a, tr), go(b, tr))
 
       case Con(x, t, as) =>
         IR.Con(
@@ -117,6 +117,9 @@ object Compiler:
             else (go(a, false), go(b), p)
           )
         )
+
+      case Case(scrut, TDef(Nil, t), cs) =>
+        IR.Case(go(scrut, false), go(t), cs.map((x, b) => (x, go(b, tr))))
 
       case _ => impossible()
 

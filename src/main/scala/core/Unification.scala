@@ -43,6 +43,13 @@ object Unification:
           go(b(VVar(pren.cod), VVar(pren.cod + 1)))(pren.lift.lift),
           goSp(hd, sp)
         )
+      case SCase(scrut, t, vf, cs) =>
+        Case(
+          goSp(hd, scrut),
+          go(t),
+          go(vf),
+          cs.map((x, b) => (x, go(b)))
+        )
 
     def goCl(c: Clos)(implicit pren: PRen): Tm =
       go(c(VVar(pren.cod)))(pren.lift)
@@ -142,6 +149,9 @@ object Unification:
       unify(sp1, sp2)
       val v = VVar(k); val w = VVar(k + 1)
       unify(b1(v, w), b2(v, w))(k + 2)
+    case (SCase(sp1, t1, vf1, cs1), SCase(sp2, t2, vf2, cs2)) =>
+      unify(sp1, sp2); unify(t1, t2); unify(vf1, vf2)
+      cs1.foreach((x, a) => unify(a, cs2.find((y, b) => x == y).get._2))
     case _ => throw UnifyError("spine mismatch")
 
   private def unify(a: Clos, b: Clos)(implicit k: Lvl): Unit =

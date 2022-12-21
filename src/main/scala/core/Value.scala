@@ -26,6 +26,7 @@ object Value:
     case SIf(spine: Spine, ty: VTy, ifTrue: Val, ifFalse: Val)
     case SBinop(left: Spine, op: Op, right: Val)
     case SFix(go: Name, name: Name, body: Clos2, arg: Spine)
+    case SCase(scrut: Spine, ty: VTy, vf: VTy, cases: List[(Name, Val)])
   export Spine.*
 
   enum Head:

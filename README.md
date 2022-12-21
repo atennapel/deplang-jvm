@@ -46,7 +46,7 @@ TODO:
 - [ ] Datatypes
   - [x] Constructors
   - [ ] Elimination
-  - [ ] Monomorphize datatypes
 - [ ] More simplification: case-of-case, app and case commutation
 - [ ] Better inlining (inline linear lambdas, constants, globals)
 - [ ] Combine jumps (for example if+comparisons)
+- [ ] Way to monomorphize datatypes on demand (staged datatypes?)

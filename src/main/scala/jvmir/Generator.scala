@@ -22,6 +22,9 @@ import java.io.FileOutputStream
 object Generator:
   private final case class Ctx(moduleName: String, moduleType: Type)
 
+  private val tcons: mutable.Map[Name, Type] = mutable.Map.empty
+  private val tconTypes: mutable.Map[Name, String] = mutable.Map.empty
+
   def generate(moduleName: String, ds: Defs): Unit =
     implicit val cw: ClassWriter = new ClassWriter(
       ClassWriter.COMPUTE_MAXS + ClassWriter.COMPUTE_FRAMES
@@ -261,6 +264,8 @@ object Generator:
       superName,
       null
     )
+    tcons += x -> Type.getType(s"L$className;")
+    tconTypes += x -> superName
     // fields
     as.zipWithIndex.foreach((ty, i) => {
       cw.visitField(
@@ -452,6 +457,76 @@ object Generator:
             mg.visitLabel(skip)
             mg.push(true)
             mg.visitLabel(end)
+
+      case Case(t, rt, cs) if cs.isEmpty =>
+        rt match
+          case TBool => mg.push(false)
+          case TInt  => mg.push(0)
+          case _     => mg.visitInsn(ACONST_NULL)
+      case Case(scrut, rt, cs) =>
+        gen(scrut)
+        val lEnd = new Label
+        var lNextCase = new Label
+        cs.init.foreach { (c, b) =>
+          val contype = tcons(c)
+          mg.visitLabel(lNextCase)
+          lNextCase = new Label
+          mg.dup()
+          val y = tconTypes(c)
+          val conType = Type.getType(s"L$y$$$c;")
+          mg.getStatic(
+            Type.getType(s"L$y;"),
+            s"$c$$",
+            conType
+          )
+          mg.visitJumpInsn(IF_ACMPNE, lNextCase)
+          var mctx2: MethodCtx = mctx
+          ts.zipWithIndex.foreach {
+            case ((t1, t2), i) => {
+              val desc1 = descriptor(t1)
+              val desc2 = descriptor(t2)
+              val local = mg.newLocal(desc2)
+              mg.dup()
+              mg.getField(contype, s"a$i", desc1)
+              mg.unbox(desc2)
+              mg.storeLocal(local)
+              mctx2 = mctx2.copy(
+                lvl = mctx2.lvl + 1,
+                locals = mctx2.locals + (mctx2.lvl -> local)
+              )
+            }
+          }
+          mg.pop()
+          gen(b)(ctx, mctx2, cw, mg, methodStart)
+          mg.visitJumpInsn(GOTO, lEnd)
+        }
+        mg.visitLabel(lNextCase)
+        val (c, ts, b) = cs.last
+        val contype = tcons
+          .get(c)
+          .getOrElse(
+            null
+          ) // if c is not found, then we are in the otherwise case
+        if ts.nonEmpty then mg.checkCast(contype)
+        var mctx2: MethodCtx = mctx
+        ts.zipWithIndex.foreach {
+          case ((t1, t2), i) => {
+            val desc1 = descriptor(t1)
+            val desc2 = descriptor(t2)
+            val local = mg.newLocal(desc2)
+            mg.dup()
+            mg.getField(contype, s"a$i", desc1)
+            mg.unbox(desc2)
+            mg.storeLocal(local)
+            mctx2 = mctx2.copy(
+              lvl = mctx2.lvl + 1,
+              locals = mctx2.locals + (mctx2.lvl -> local)
+            )
+          }
+        }
+        mg.pop()
+        gen(b)(ctx, mctx2, cw, mg, methodStart)
+        mg.visitLabel(lEnd)
 
   private def box(t: Ty)(implicit mg: GeneratorAdapter): Unit = t match
     case TInt =>

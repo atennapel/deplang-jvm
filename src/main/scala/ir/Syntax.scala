@@ -48,6 +48,7 @@ object Syntax:
     case Binop(op: Op, left: Tm, right: Tm)
 
     case Con(name: Name, ty: Ty, args: List[(Tm, Ty, Boolean)])
+    case Case(scrut: Tm, ty: TDef, cases: List[(Name, Tm)])
 
     override def toString: String = this match
       case Local(x, _)  => s"'$x"
@@ -72,6 +73,9 @@ object Syntax:
 
       case Con(x, _, Nil) => s"$x"
       case Con(x, _, as)  => s"($x ${as.map(_._1).mkString(" ")})"
+
+      case Case(x, _, cs) =>
+        s"(case $x | ${cs.map((c, b) => s"$c => $b").mkString(" | ")})"
 
     def flattenLams: (List[(Int, Ty)], Option[Ty], Tm) =
       def go(t: Tm): (List[(Int, Ty)], Option[Ty], Tm) = t match
@@ -115,6 +119,12 @@ object Syntax:
       case Con(_, _, as) =>
         as.foldLeft[List[(Int, TDef)]](Nil) { case (fv, (t, _, _)) =>
           fv ++ t.freeVars
+        }
+
+      case Case(a, _, cs) =>
+        a.freeVars ++ cs.map(_._2).foldLeft[List[(Int, TDef)]](Nil) {
+          case (fv, t) =>
+            fv ++ t.freeVars
         }
 
       case _ => Nil
@@ -208,6 +218,13 @@ object Syntax:
 
       case Con(x, t, as) =>
         Con(x, t, as.map((a, b, p) => (a.subst(sub, scope), b, p)))
+
+      case Case(scrut, ty, cs) =>
+        Case(
+          scrut.subst(sub, scope),
+          ty,
+          cs.map((x, c) => (x, c.subst(sub, scope)))
+        )
 
       case _ => this
   export Tm.*

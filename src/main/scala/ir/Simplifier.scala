@@ -105,6 +105,16 @@ object Simplifier:
         )
       )
 
+    case Case(Con(c, ct, as), ty, cs) => Some(cs.find((y, b) => y == c).get._2)
+    case Case(t, TDef(ps, rt), cs) if ps.nonEmpty => ???
+    case Case(t, ty, cs) =>
+      go(t) match
+        case Some(t) => Some(Case(t, ty, cs))
+        case None =>
+          orL(go, cs.map(_._2)).map(csb =>
+            Case(t, ty, (0 until cs.size).map(i => (cs(i)._1, csb(i))).toList)
+          )
+
   private def binop(op: Op, a: Tm, b: Tm): Option[Tm] = (op, a, b) match
     case (OAdd, IntLit(a), IntLit(b)) => Some(IntLit(a + b))
     case (OAdd, IntLit(0), b)         => Some(b)

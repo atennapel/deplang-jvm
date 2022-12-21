@@ -258,6 +258,21 @@ object Elaboration:
         )
         Fix(go, x, eb, ea)
 
+      case (S.Case(scrut, cs), _) =>
+        force(univ) match
+          case VU1 => check(S.Quote(tm), ty, univ)
+          case VU(vf) =>
+            val (escrut, scrutty) = infer(scrut, VUVal())
+            val (x, as) = force(scrutty) match
+              case VTCon(x, as) => (x, as)
+              case _ =>
+                throw ElaborateError(
+                  s"expected type constructor in case $tm, but got: ${ctx.pretty(scrutty)}"
+                )
+            val ecs = cs.map((x, b) => (x, check(b, ty, VU(vf))))
+            Case(escrut, ctx.quote(ty), ctx.quote(vf), ecs)
+          case _ => throw ElaborateError(s"invalid universe in check")
+
       case (tm, _) =>
         val (etm, ty2, univ2) = insert(infer(tm))
         debug(
