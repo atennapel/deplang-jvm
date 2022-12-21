@@ -24,7 +24,7 @@ object Syntax:
   enum Tm:
     case Arg(ix: Int, ty: Ty)
     case Local(name: Int, ty: Ty)
-    case Global(name: Name, ty: TDef, args: List[Tm])
+    case Global(name: Name, tailRecursive: Boolean, ty: TDef, args: List[Tm])
     case Let(name: Int, ty: Ty, value: Tm, body: Tm)
 
     case Pair(fst: Tm, snd: Tm)
@@ -42,10 +42,11 @@ object Syntax:
     case Unbox(ty: Ty, tm: Tm)
 
     override def toString: String = this match
-      case Arg(ix, _)        => s"'arg$ix"
-      case Local(x, _)       => s"'$x"
-      case Global(x, _, Nil) => s"$x"
-      case Global(x, _, as)  => s"$x(${as.mkString(", ")})"
+      case Arg(ix, _)            => s"'arg$ix"
+      case Local(x, _)           => s"'$x"
+      case Global(x, tr, _, Nil) => s"$x${if tr then "{tr}" else ""}"
+      case Global(x, tr, _, as) =>
+        s"$x${if tr then "{tr}" else ""}(${as.mkString(", ")})"
       case Let(x, t, v, b) =>
         s"(let '$x : $t = $v in $b)"
 

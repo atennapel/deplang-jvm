@@ -42,7 +42,7 @@ TODO:
 - [x] Fixpoint
 - [x] Add Int and primitive binops
 - [x] Remove Nat
-- [ ] Tail recursion
+- [x] Tail recursion
 - [ ] Datatypes
 - [ ] More simplification: case-of-case, app and case commutation
 - [ ] Better inlining (inline linear lambdas, constants, globals)

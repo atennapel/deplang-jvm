@@ -13,4 +13,4 @@ fold : {A : U0 Val} -> Int -> A -> (Int -> A -> A) -> A =
 
 add : Int -> Int -> Int := \a b. fold a b (\_ n. n + 1);
 
-main : Int -> Int := \_. add 1 2;
+main : Int -> Int := \_. fac 3;

@@ -127,6 +127,7 @@ object Generator:
       ds.foreach(d => {
         d match
           case DDef(x, g, Nil, rt, b) =>
+            implicit val methodStart = mg.newLabel()
             gen(b)
             mg.putStatic(ctx.moduleType, x.expose, gen(rt))
           case _ =>
@@ -159,19 +160,31 @@ object Generator:
           cw
         )
       implicit val locals: Locals = IntMap.empty
+      implicit val methodStart = mg.newLabel()
+      mg.visitLabel(methodStart)
       gen(v)
       mg.returnValue()
       mg.endMethod()
 
   private def gen(
       t: Tm
-  )(implicit mg: GeneratorAdapter, ctx: Ctx, locals: Locals): Unit =
+  )(implicit
+      mg: GeneratorAdapter,
+      ctx: Ctx,
+      locals: Locals,
+      methodStart: Label
+  ): Unit =
     t match
       case Arg(ix, ty) => mg.loadArg(ix)
 
-      case Global(x, TDef(Nil, rt), Nil) =>
+      case Global(x, _, TDef(Nil, rt), Nil) =>
         mg.getStatic(ctx.moduleType, x.expose, gen(rt))
-      case Global(x, TDef(ps, rt), as) =>
+      case Global(x, true, TDef(ps, rt), as) =>
+        if ps.size != as.size then impossible()
+        as.foreach(gen)
+        Range.inclusive(as.size - 1, 0, -1).foreach(i => mg.storeArg(i))
+        mg.visitJumpInsn(GOTO, methodStart)
+      case Global(x, false, TDef(ps, rt), as) =>
         if ps.size != as.size then impossible()
         as.foreach(gen)
         mg.invokeStatic(
@@ -184,7 +197,7 @@ object Generator:
         val vr = mg.newLocal(gen(ty))
         gen(v)
         mg.storeLocal(vr)
-        gen(b)(mg, ctx, locals + (x -> vr))
+        gen(b)(mg, ctx, locals + (x -> vr), methodStart)
 
       case Pair(fst, snd) =>
         mg.newInstance(PAIR_TYPE)

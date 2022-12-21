@@ -39,15 +39,21 @@ object Compiler:
       implicit val newDefs: NewDefs = mutable.ArrayBuffer.empty
       implicit val uniq: Ref[Int] = Ref(0)
       val newdef =
-        IR.DDef(name, false, ps.map((_, t) => go(t)), go(t.retrn), go(b))
+        IR.DDef(name, false, ps.map((_, t) => go(t)), go(t.retrn), go(b, true))
       newDefs.toList ++ List(newdef)
 
   private type Args = Map[Int, Int]
   private type NewDefs = mutable.ArrayBuffer[IR.Def]
 
   private def go(
-      t: Tm
-  )(implicit name: Name, args: Args, defs: NewDefs, uniq: Ref[Int]): IR.Tm =
+      t: Tm,
+      tr: Boolean
+  )(implicit
+      name: Name,
+      args: Args,
+      defs: NewDefs,
+      uniq: Ref[Int]
+  ): IR.Tm =
     t match
       case Local(x, t) =>
         args.get(x) match
@@ -55,43 +61,50 @@ object Compiler:
           case None     => IR.Local(x, goTy(t))
       case Global(x, t) =>
         if t.params.nonEmpty then impossible()
-        IR.Global(norm(x), go(t), Nil)
+        IR.Global(norm(x), false, go(t), Nil)
       case Let(x, TDef(Nil, t), v, b) =>
-        IR.Let(x, go(t), go(v), go(b)(name, args - x, defs, uniq))
+        IR.Let(x, go(t), go(v, false), go(b, tr)(name, args - x, defs, uniq))
 
       case Let(x, t, v, b) =>
         val g = lambdaLift(uniq.updateGetOld(_ + 1), t, v)
-        go(b.subst(Map(x -> g)))
+        go(b.subst(Map(x -> g)), tr)
       case Lam(x, t1, t2, b) =>
         val g = lambdaLift(uniq.updateGetOld(_ + 1), TDef(t1, t2), t)
-        go(g)
+        go(g, tr)
 
       case Fix(g, x, t1, t2, b, arg) =>
         val glb = fixLift(uniq.updateGetOld(_ + 1), g, x, t1, t2, b)
-        go(App(glb, arg))
+        go(App(glb, arg), true)
 
       case App(f0, a) =>
         val (f, as) = t.flattenApps
         f match
           case Global(x, t) =>
             if t.params.size != as.size then impossible()
-            IR.Global(norm(x), go(t), as.map(go))
+            IR.Global(
+              norm(x),
+              if x == name then tr else false,
+              go(t),
+              as.map(go(_, false))
+            )
           case Fix(g, x, t1, t2, b, arg) =>
             val glb = fixLift(uniq.updateGetOld(_ + 1), g, x, t1, t2, b)
-            go(glb.apps(arg :: as))
+            go(glb.apps(arg :: as), true)
           case _ => impossible()
 
-      case Pair(t1, t2, fst, snd) => IR.Pair(box(t1, go(fst)), box(t2, go(snd)))
-      case Fst(ty, t)             => unbox(ty, IR.Fst(go(t)))
-      case Snd(ty, t)             => unbox(ty, IR.Snd(go(t)))
+      case Pair(t1, t2, fst, snd) =>
+        IR.Pair(box(t1, go(fst, false)), box(t2, go(snd, false)))
+      case Fst(ty, t) => unbox(ty, IR.Fst(go(t, false)))
+      case Snd(ty, t) => unbox(ty, IR.Snd(go(t, false)))
 
       case True  => IR.True
       case False => IR.False
 
       case IntLit(n)       => IR.IntLit(n)
-      case Binop(op, a, b) => IR.Binop(op, go(a), go(b))
+      case Binop(op, a, b) => IR.Binop(op, go(a, false), go(b, false))
 
-      case If(TDef(Nil, t), c, a, b) => IR.If(go(t), go(c), go(a), go(b))
+      case If(TDef(Nil, t), c, a, b) =>
+        IR.If(go(t), go(c, false), go(a, true), go(b, true))
 
       case _ => impossible()
 
@@ -169,7 +182,7 @@ object Compiler:
       true,
       nps.map((_, t) => go(t)),
       go(rt),
-      go(d)(newname, args, defs, Ref(0))
+      go(d, true)(newname, args, defs, Ref(0))
     )
     defs += newdef
     Global(newname, TDef(nps.map(_._2), rt))
@@ -201,7 +214,7 @@ object Compiler:
       true,
       nps.map((_, t) => go(t)),
       go(rt),
-      go(d2)(newname, args, defs, Ref(0))
+      go(d2, true)(newname, args, defs, Ref(0))
     )
     defs += newdef
     gl
