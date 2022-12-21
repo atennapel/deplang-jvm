@@ -496,7 +496,67 @@ object Elaboration:
         val eu = zonk(checkType(u, VU1)(Ctx.empty((0, 0))))(lvl0, Nil)
         val veu = eval(eu)(Nil)
         val (ev, et) = elaborate(v, t, veu)
+        debug(s"$x : $et = $ev")
         setGlobal(GlobalEntry(x, ev, et, eval(ev)(Nil), eval(et)(Nil), veu))
         DDef(x, eu, et, ev)
+      case S.DData(x, ps, cs) =>
+        val tconty =
+          ps.foldLeft(VUVal())((rt, _) => vpi("_", VUVal(), VU1, VU1, _ => rt))
+        val rt =
+          TCon(x, (0 until ps.size).reverse.map(i => Local(mkIx(i))).toList)
+        val lam = ps.foldRight(rt)((p, b) => Lam(DoBind(p), Expl, b))
+        val tcon =
+          setGlobal(
+            GlobalEntry(
+              x,
+              lam,
+              quote(tconty)(lvl0),
+              eval(lam)(Nil),
+              tconty,
+              VU1
+            )
+          )
+        implicit val ctx: Ctx =
+          ps.foldLeft(Ctx.empty((0, 0)))((ctx, p) =>
+            ctx.bind(DoBind(p), VUVal(), VU1)
+          )
+        val ecs = cs.map((c, ts) => {
+          val ets = ts.map(t => {
+            val et = check(t, VUVal(), VU1)
+            zonk(et)(lvl0, Nil)
+          })
+          val ty1 = ets.foldRight(Lift(VFVal, rt))((p, rt) =>
+            Pi(DontBind, Expl, Lift(VFVal, p), U1, Wk(rt), U1)
+          )
+          val ty2 = ps.foldRight(ty1)((p, rt) =>
+            Pi(DoBind(p), Impl, quote(VUVal())(lvl0), U1, rt, U1)
+          )
+          val inner = Quote(
+            Con(
+              c,
+              wk(ets.size, rt),
+              (0 until ets.size).reverse
+                .map(i => {
+                  val tm = Splice(Local(mkIx(i)))
+                  val ety = ets(ets.size - i - 1)
+                  val ty = wk(ets.size, ety)
+                  val poly = ety match
+                    case Local(_) => true
+                    case _        => false
+                  (tm, ty, poly)
+                })
+                .toList
+            )
+          )
+          val lam1 = (0 until ets.size).foldRight(inner)((i, b) =>
+            Lam(DoBind(Name(s"a$i")), Expl, b)
+          )
+          val lam2 = ps.foldRight(lam1)((p, b) => Lam(DoBind(p), Impl, b))
+          setGlobal(
+            GlobalEntry(c, lam2, ty2, eval(lam2)(Nil), eval(ty2)(Nil), VU1)
+          )
+          (c, ets)
+        })
+        DData(x, ps, ecs)
 
   def elaborate(ds: S.Defs): Defs = Defs(ds.toList.map(elaborate))

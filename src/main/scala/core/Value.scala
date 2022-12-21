@@ -59,6 +59,9 @@ object Value:
 
     case VInt
     case VIntLit(value: Int)
+
+    case VTCon(name: Name, args: List[Val])
+    case VCon(name: Name, ty: VTy, args: List[(Val, VTy, Boolean)])
   export Val.*
 
   private def name(x: String): Bind =

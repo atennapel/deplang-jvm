@@ -119,6 +119,7 @@ object Syntax:
 
   enum Def:
     case DDef(name: Name, univ: Ty, ty: Option[Ty], value: Tm)
+    case DData(name: Name, params: List[Name], cases: List[(Name, List[Ty])])
 
     override def toString: String = this match
       case DDef(x, u, Some(t), v) =>
@@ -135,4 +136,10 @@ object Syntax:
           case Var(Name("U1"))                              => s""
           case _                                            => s"?"
         s"$x $s= $v;"
+      case DData(x, ps, cs) =>
+        s"data $x${if ps.isEmpty then "" else s" ${ps.mkString(" ")}"} := ${cs
+            .map((x, ts) =>
+              s"$x${if ts.isEmpty then "" else s" ${ts.mkString(" ")}"}"
+            )
+            .mkString(" | ")};"
   export Def.*

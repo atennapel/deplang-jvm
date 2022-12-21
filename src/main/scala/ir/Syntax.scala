@@ -7,11 +7,16 @@ object Syntax:
     case TBool
     case TInt
     case TPair(fst: Ty, snd: Ty)
+    case TCon(name: Name, args: List[Ty])
+    case TPoly
 
     override def toString: String = this match
       case TBool           => "Bool"
       case TInt            => "Int"
       case TPair(fst, snd) => s"($fst ** $snd)"
+      case TCon(x, Nil)    => s"$x"
+      case TCon(x, as)     => s"($x ${as.mkString(" ")})"
+      case TPoly           => "Poly"
   export Ty.*
 
   final case class TDef(params: List[Ty], retrn: Ty):
@@ -42,6 +47,8 @@ object Syntax:
     case IntLit(value: Int)
     case Binop(op: Op, left: Tm, right: Tm)
 
+    case Con(name: Name, ty: Ty, args: List[(Tm, Ty, Boolean)])
+
     override def toString: String = this match
       case Local(x, _)  => s"'$x"
       case Global(x, _) => s"$x"
@@ -62,6 +69,9 @@ object Syntax:
 
       case IntLit(n)       => s"$n"
       case Binop(op, a, b) => s"($a $op $b)"
+
+      case Con(x, _, Nil) => s"$x"
+      case Con(x, _, as)  => s"($x ${as.map(_._1).mkString(" ")})"
 
     def flattenLams: (List[(Int, Ty)], Option[Ty], Tm) =
       def go(t: Tm): (List[(Int, Ty)], Option[Ty], Tm) = t match
@@ -101,6 +111,11 @@ object Syntax:
       case If(_, c, a, b) => c.freeVars ++ a.freeVars ++ b.freeVars
 
       case Binop(_, a, b) => a.freeVars ++ b.freeVars
+
+      case Con(_, _, as) =>
+        as.foldLeft[List[(Int, TDef)]](Nil) { case (fv, (t, _, _)) =>
+          fv ++ t.freeVars
+        }
 
       case _ => Nil
 
@@ -191,6 +206,9 @@ object Syntax:
       case Binop(op, a, b) =>
         Binop(op, a.subst(sub, scope), b.subst(sub, scope))
 
+      case Con(x, t, as) =>
+        Con(x, t, as.map((a, b, p) => (a.subst(sub, scope), b, p)))
+
       case _ => this
   export Tm.*
 
@@ -201,7 +219,14 @@ object Syntax:
 
   enum Def:
     case DDef(name: Name, ty: TDef, value: Tm)
+    case DData(name: Name, params: List[Name], cases: List[(Name, List[Ty])])
 
     override def toString: String = this match
       case DDef(x, t, v) => s"$x : $t = $v;"
+      case DData(x, ps, cs) =>
+        s"data $x${if ps.isEmpty then "" else s" ${ps.mkString(" ")}"} := ${cs
+            .map((x, ts) =>
+              s"$x${if ts.isEmpty then "" else s" ${ts.mkString(" ")}"}"
+            )
+            .mkString(" | ")};"
   export Def.*

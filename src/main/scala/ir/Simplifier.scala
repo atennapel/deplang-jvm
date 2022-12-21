@@ -19,6 +19,7 @@ object Simplifier:
 
   private def go(d: Def): Def = d match
     case DDef(x, t, v) => DDef(x, t, go(v, LIMIT)(Set.empty))
+    case d             => d
 
   @tailrec
   private def go(t: Tm, n: Int)(implicit scope: Set[Int]): Tm =
@@ -95,6 +96,15 @@ object Simplifier:
             case None         => Some(If(t, c, a, b))
         case None => go2(a, b).map(If(t, c, _, _))
 
+    case Con(x, t, as0) =>
+      orL(go, as0.map(_._1)).map(as =>
+        Con(
+          x,
+          t,
+          (0 until as.size).map(i => (as(i), as0(i)._2, as0(i)._3)).toList
+        )
+      )
+
   private def binop(op: Op, a: Tm, b: Tm): Option[Tm] = (op, a, b) match
     case (OAdd, IntLit(a), IntLit(b)) => Some(IntLit(a + b))
     case (OAdd, IntLit(0), b)         => Some(b)
@@ -123,6 +133,11 @@ object Simplifier:
       case (Some(a), None)    => Some((a, b))
       case (None, Some(b))    => Some((a, b))
       case (Some(a), Some(b)) => Some((a, b))
+
+  def orL[A](f: A => Option[A], l: List[A]): Option[List[A]] =
+    val l1 = l.map(x => (x, f(x)))
+    if l1.forall((_, o) => o.isEmpty) then None
+    else Some(l1.map((x, o) => o.getOrElse(x)))
 
   private def fresh(implicit scope: Set[Int]): Int =
     if scope.isEmpty then 0 else scope.max + 1

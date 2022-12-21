@@ -85,3 +85,7 @@ object Zonking:
     case IntTy           => tm
     case IntLit(v)       => tm
     case Binop(op, a, b) => Binop(op, zonk(a), zonk(b))
+
+    case TCon(x, as) => TCon(x, as.map(zonk))
+    case Con(x, t, as) =>
+      Con(x, zonk(t), as.map((a, b, p) => (zonk(a), zonk(b), p)))

@@ -28,7 +28,8 @@ object Parser:
         "if",
         "then",
         "else",
-        "fix"
+        "fix",
+        "data"
       ),
       operators = Set(
         "=",
@@ -72,7 +73,7 @@ object Parser:
 
   object TmParser:
     import parsley.expr.{precedence, Ops, InfixL, InfixR, Prefix, Postfix}
-    import parsley.combinator.{many, some, option, sepEndBy}
+    import parsley.combinator.{many, some, option, sepEndBy, sepBy}
     import parsley.Parsley.pos
 
     import LangLexer.{ident as ident0, userOp as userOp0, natural}
@@ -246,15 +247,23 @@ object Parser:
     lazy val defsP: Parsley[Defs] = sepEndBy(defP, ";").map(Defs.apply)
 
     private lazy val defP: Parsley[Def] =
-      (identOrOp <~> option(
-        ":" *> tm
-      ) <~> ("=" #> Var(Name("U1")) <|> ":=" #> App(
-        Var(Name("U0")),
-        Var(Name("Fun")),
-        Expl
-      ) <|> "::=" #> App(Var(Name("U0")), Var(Name("Val")), Expl))
-        <~> tm).map { case (((x, ot), univ), v) =>
-        DDef(x, univ, ot, v)
-      }
+      ddata <|>
+        (identOrOp <~> option(
+          ":" *> tm
+        ) <~> ("=" #> Var(Name("U1")) <|> ":=" #> App(
+          Var(Name("U0")),
+          Var(Name("Fun")),
+          Expl
+        ) <|> "::=" #> App(Var(Name("U0")), Var(Name("Val")), Expl))
+          <~> tm).map { case (((x, ot), univ), v) =>
+          DDef(x, univ, ot, v)
+        }
+
+    lazy val ddata: Parsley[Def] =
+      ("data" *> identOrOp <~> many(identOrOp) <~> ":=" *> sepBy(
+        identOrOp <~> many(atom),
+        "|"
+      ))
+        .map { case ((x, tvs), cons) => DData(x, tvs, cons) }
 
   lazy val parser: Parsley[Defs] = LangLexer.fully(TmParser.defsP)

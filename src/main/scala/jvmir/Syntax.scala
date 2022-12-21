@@ -7,11 +7,15 @@ object Syntax:
     case TBool
     case TInt
     case TPair
+    case TCon(name: Name)
+    case TObject
 
     override def toString: String = this match
-      case TBool => "Bool"
-      case TInt  => "Int"
-      case TPair => s"Pair"
+      case TBool   => "Bool"
+      case TInt    => "Int"
+      case TPair   => s"Pair"
+      case TCon(x) => s"$x"
+      case TObject => "Object"
   export Ty.*
 
   final case class TDef(params: List[Ty], retrn: Ty):
@@ -38,6 +42,8 @@ object Syntax:
     case IntLit(value: Int)
     case Binop(op: Op, left: Tm, right: Tm)
 
+    case Con(name: Name, ty: Ty, args: List[(Tm, Ty, Boolean)])
+
     case Box(ty: Ty, tm: Tm)
     case Unbox(ty: Ty, tm: Tm)
 
@@ -61,6 +67,9 @@ object Syntax:
       case IntLit(n)       => s"$n"
       case Binop(op, a, b) => s"($a $op $b)"
 
+      case Con(x, _, Nil) => s"$x"
+      case Con(x, _, as)  => s"($x ${as.map(_._1).mkString(" ")})"
+
       case Box(ty, tm)   => s"(box {$ty} $tm)"
       case Unbox(ty, tm) => s"(unbox {$ty} $tm)"
   export Tm.*
@@ -78,10 +87,17 @@ object Syntax:
         retrn: Ty,
         value: Tm
     )
+    case DData(name: Name, cases: List[(Name, List[Ty])])
 
     override def toString: String = this match
       case DDef(x, g, Nil, rt, v) =>
         s"${if g then "(gen) " else ""}$x : $rt = $v;"
       case DDef(x, g, ps, rt, v) =>
         s"${if g then "(gen) " else ""}$x (${ps.mkString(", ")}) : $rt = $v;"
+      case DData(x, cs) =>
+        s"data $x := ${cs
+            .map((x, ts) =>
+              s"$x${if ts.isEmpty then "" else s" ${ts.mkString(" ")}"}"
+            )
+            .mkString(" | ")};"
   export Def.*

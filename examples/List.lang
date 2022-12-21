@@ -1,0 +1,7 @@
+data List A := Nil | (::) A (List A);
+
+id : {A : U0 Val} -> List A -> List A = \x. x;
+
+test ::= 0 :: Nil;
+
+main : Int -> Int := \_. 0; 

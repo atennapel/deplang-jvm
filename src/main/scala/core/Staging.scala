@@ -18,6 +18,11 @@ object Staging:
       case Def0(e, _) => e
       case Def1(e, _) => e
       case _          => impossible()
+
+    def size: Int = this match
+      case Def0(e, _) => 1 + e.size
+      case Def1(e, _) => 1 + e.size
+      case Empty      => 0
   import Env.*
 
   private enum Val1:
@@ -34,6 +39,8 @@ object Staging:
     case VFun1(left: Val1, vf: Val1, right: Val1 => Val1)
     case VPairTy1(fst: Val1, snd: Val1 => Val1)
     case VPair1(fst: Val1, snd: Val1)
+    case VTCon1(name: Name, args: List[Val1])
+    case VPoly1
   import Val1.*
 
   private enum Val0:
@@ -51,6 +58,7 @@ object Staging:
     case VIf0(ty: Val1, cond: Val0, ifTrue: Val0, ifFalse: Val0)
     case VIntLit0(value: Int)
     case VBinop0(op: Op, left: Val0, right: Val0)
+    case VCon0(name: Name, ty: Val1, args: List[(Val0, Val1, Boolean)])
   import Val0.*
 
   private def vvar1(ix: Ix)(implicit env: Env): Val1 =
@@ -105,6 +113,8 @@ object Staging:
 
     case Wk(t) => eval1(t)(env.tail)
 
+    case TCon(x, as) => VTCon1(x, as.map(eval1))
+
     case _ => impossible()
 
   private def vvar0(ix: Ix)(implicit env: Env): Val0 =
@@ -154,6 +164,9 @@ object Staging:
     case IntLit(n)       => VIntLit0(n)
     case Binop(op, a, b) => VBinop0(op, eval0(a), eval0(b))
 
+    case Con(x, t, as) =>
+      VCon0(x, eval1(t), as.map((a, b, p) => (eval0(a), eval1(b), p)))
+
     case _ => impossible()
 
   // staging
@@ -177,55 +190,80 @@ object Staging:
     case IntLit(value: Int)
     case Binop(op: Op, left: Tmp, right: Tmp)
 
-  private def quote0ir(v: Val0)(implicit k: Lvl): Tmp = v match
-    case VVar0(l)    => Tmp.Local(l.toIx)
-    case VGlobal0(x) => Tmp.Global(x)
-    case VApp0(f, a) => Tmp.App(quote0ir(f), quote0ir(a))
-    case VLam0(x, b) => Tmp.Lam(x, quote0ir(b(VVar0(k)))(k + 1))
-    case VFix0(go, x, b, arg) =>
-      Tmp.Fix(go, x, quote0ir(b(VVar0(k), VVar0(k + 1)))(k + 2), quote0ir(arg))
-    case VLet0(x, VU0app(VVFVal1), t, v, b) =>
-      Tmp.Let(
-        x,
-        IR.TDef(quote1ty(t)),
-        quote0ir(v),
-        quote0ir(b(VVar0(k)))(k + 1)
-      )
-    case VLet0(x, VU0app(VVFFun1), t, v, b) =>
-      Tmp.Let(x, quote1tdef(t), quote0ir(v), quote0ir(b(VVar0(k)))(k + 1))
-    case VPair0(fst, snd) => Tmp.Pair(quote0ir(fst), quote0ir(snd))
-    case VFst0(t)         => Tmp.Fst(quote0ir(t))
-    case VSnd0(t)         => Tmp.Snd(quote0ir(t))
-    case VTrue0           => Tmp.True
-    case VFalse0          => Tmp.False
-    case VIf0(t, c, a, b) =>
-      Tmp.If(quote1tdefOrTy(t), quote0ir(c), quote0ir(a), quote0ir(b))
-    case VIntLit0(n)       => Tmp.IntLit(n)
-    case VBinop0(op, a, b) => Tmp.Binop(op, quote0ir(a), quote0ir(b))
-    case _                 => impossible()
+    case Con(name: Name, ty: IR.Ty, args: List[(Tmp, IR.Ty, Boolean)])
 
-  private def quote1ty(v: Val1)(implicit k: Lvl): IR.Ty = v match
-    case VBool1 => IR.TBool
-    case VInt1  => IR.TInt
-    case VPairTy1(fst, snd) =>
-      IR.TPair(quote1ty(fst), quote1ty(snd(null))(k + 1))
-    case _ => impossible()
+  private def quote0ir(v: Val0)(implicit k: Lvl): Tmp =
+    // debug(s"quote0ir $v")
+    v match
+      case VVar0(l)    => Tmp.Local(l.toIx)
+      case VGlobal0(x) => Tmp.Global(x)
+      case VApp0(f, a) => Tmp.App(quote0ir(f), quote0ir(a))
+      case VLam0(x, b) => Tmp.Lam(x, quote0ir(b(VVar0(k)))(k + 1))
+      case VFix0(go, x, b, arg) =>
+        Tmp.Fix(
+          go,
+          x,
+          quote0ir(b(VVar0(k), VVar0(k + 1)))(k + 2),
+          quote0ir(arg)
+        )
+      case VLet0(x, VU0app(VVFVal1), t, v, b) =>
+        Tmp.Let(
+          x,
+          IR.TDef(quote1ty(t)),
+          quote0ir(v),
+          quote0ir(b(VVar0(k)))(k + 1)
+        )
+      case VLet0(x, VU0app(VVFFun1), t, v, b) =>
+        Tmp.Let(x, quote1tdef(t), quote0ir(v), quote0ir(b(VVar0(k)))(k + 1))
+      case VPair0(fst, snd) => Tmp.Pair(quote0ir(fst), quote0ir(snd))
+      case VFst0(t)         => Tmp.Fst(quote0ir(t))
+      case VSnd0(t)         => Tmp.Snd(quote0ir(t))
+      case VTrue0           => Tmp.True
+      case VFalse0          => Tmp.False
+      case VIf0(t, c, a, b) =>
+        Tmp.If(quote1tdefOrTy(t), quote0ir(c), quote0ir(a), quote0ir(b))
+      case VIntLit0(n)       => Tmp.IntLit(n)
+      case VBinop0(op, a, b) => Tmp.Binop(op, quote0ir(a), quote0ir(b))
+      case VCon0(x, t, as) =>
+        Tmp.Con(
+          x,
+          quote1ty(t),
+          as.map((a, b, p) => (quote0ir(a), quote1ty(b), p))
+        )
+      case _ => impossible()
+
+  private def quote1ty(v: Val1)(implicit k: Lvl): IR.Ty =
+    // debug(s"quote1ty $v")
+    v match
+      case VBool1 => IR.TBool
+      case VInt1  => IR.TInt
+      case VPairTy1(fst, snd) =>
+        IR.TPair(quote1ty(fst), quote1ty(snd(null))(k + 1))
+      case VTCon1(x, as) => IR.TCon(x, as.map(quote1ty))
+      case VPoly1        => IR.TPoly
+      case _             => impossible()
 
   private def quote1tdef(v: Val1, ps: List[IR.Ty] = Nil)(implicit
       k: Lvl
-  ): IR.TDef = v match
-    case VFun1(a, VU0app(VVFVal1), b) =>
-      IR.TDef(ps.reverse ++ List(quote1ty(a)), quote1ty(b(null))(k + 1))
-    case VFun1(a, VU0app(VVFFun1), b) =>
-      quote1tdef(b(null), quote1ty(a) :: ps)(k + 1)
-    case t => impossible()
+  ): IR.TDef =
+    // debug(s"quote1tdef $v")
+    v match
+      case VFun1(a, VU0app(VVFVal1), b) =>
+        IR.TDef(ps.reverse ++ List(quote1ty(a)), quote1ty(b(null))(k + 1))
+      case VFun1(a, VU0app(VVFFun1), b) =>
+        quote1tdef(b(null), quote1ty(a) :: ps)(k + 1)
+      case t => impossible()
 
-  private def quote1tdefOrTy(v: Val1)(implicit k: Lvl): IR.TDef = v match
-    case VBool1 => IR.TDef(IR.TBool)
-    case VInt1  => IR.TDef(IR.TInt)
-    case VPairTy1(fst, snd) =>
-      IR.TDef(IR.TPair(quote1ty(fst), quote1ty(snd(null))(k + 1)))
-    case _ => quote1tdef(v)
+  private def quote1tdefOrTy(v: Val1)(implicit k: Lvl): IR.TDef =
+    // debug(s"quote1tdefOrTy $v")
+    v match
+      case VBool1 => IR.TDef(IR.TBool)
+      case VInt1  => IR.TDef(IR.TInt)
+      case VPairTy1(fst, snd) =>
+        IR.TDef(IR.TPair(quote1ty(fst), quote1ty(snd(null))(k + 1)))
+      case VTCon1(x, as) => IR.TDef(IR.TCon(x, as.map(quote1ty)))
+      case VPoly1        => IR.TDef(IR.TPoly)
+      case _             => quote1tdef(v)
 
   private def stageIR(tm: Tm): Tmp =
     debug(s"stageIR $tm")
@@ -234,6 +272,10 @@ object Staging:
   private def stageIRTy(tm: Tm): IR.Ty =
     debug(s"stageIRTy $tm")
     quote1ty(eval1(tm)(Empty))(lvl0)
+
+  private def stageIRTy(env: Env, tm: Tm): IR.Ty =
+    debug(s"stageIRTy $tm")
+    quote1ty(eval1(tm)(env))(mkLvl(env.size))
 
   private def stageIRTDef(tm: Tm): IR.TDef =
     debug(s"stageIRDef $tm")
@@ -350,6 +392,13 @@ object Staging:
         case _    => IR.TBool
       (IR.Binop(op, ea, eb), IR.TDef(rt))
 
+    case Tmp.Con(x, t, as) =>
+      val eas = as.map((t, ty, p) => {
+        val ea = check(t, ty)
+        (ea, ty, p)
+      })
+      (IR.Con(x, t, eas), IR.TDef(t))
+
     case _ => impossible()
 
   private def stage(d: Def)(implicit globals: GlobalsTy): Option[IR.Def] =
@@ -367,7 +416,9 @@ object Staging:
             globals += (x -> ty)
             Some(IR.DDef(x, ty, tm))
           case _ => None
-      case _ => None
+      case DData(x, ps, cs) =>
+        val env = ps.foldLeft(Empty)((env, _) => Def1(env, VPoly1))
+        Some(IR.DData(x, ps, cs.map((c, as) => (c, as.map(stageIRTy(env, _))))))
 
   def stage(ds: Defs): IR.Defs =
     implicit val globals: GlobalsTy = mutable.Map.empty
