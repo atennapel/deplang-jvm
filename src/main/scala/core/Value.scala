@@ -18,14 +18,22 @@ object Value:
     case CFun2(fn: (Val, Val) => Val)
   export Clos2.*
 
+  final case class ClosN(env: Env, tm: Tm)
+
   enum Spine:
     case SId
     case SApp(spine: Spine, arg: Val, icit: Icit)
     case SSplice(spine: Spine)
-    case SFoldNat(spine: Spine, ty: VTy, z: Val, s: Val)
     case SProj(spine: Spine, proj: ProjType)
     case SIf(spine: Spine, ty: VTy, ifTrue: Val, ifFalse: Val)
     case SBinop(left: Spine, op: Op, right: Val)
+    case SFix(go: Name, name: Name, body: Clos2, arg: Spine)
+    case SCase(
+        scrut: Spine,
+        ty: VTy,
+        vf: VTy,
+        cases: List[(Name, List[(Bind, VTy, Boolean)], ClosN)]
+    )
   export Spine.*
 
   enum Head:
@@ -38,7 +46,6 @@ object Value:
     case VRigid(head: Head, spine: Spine)
     case VFlex(id: MetaId, spine: Spine)
     case VGlobal(name: Name, spine: Spine, value: () => Val)
-    case VFix(go: Name, name: Name, body: Clos2, spine: Spine)
 
     case VVF
     case VVFVal
@@ -54,16 +61,15 @@ object Value:
     case VLift(vf: VTy, tm: VTy)
     case VQuote(tm: Val)
 
-    case VNat
-    case VZ
-    case VS(n: VTy)
-
     case VBool
     case VTrue
     case VFalse
 
     case VInt
     case VIntLit(value: Int)
+
+    case VTCon(name: Name, args: List[Val])
+    case VCon(name: Name, ty: VTy, args: List[(Val, VTy, Boolean)])
   export Val.*
 
   private def name(x: String): Bind =

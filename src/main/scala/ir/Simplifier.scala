@@ -1,5 +1,6 @@
 package ir
 
+import common.Common.*
 import Syntax.*
 
 import scala.annotation.tailrec
@@ -18,6 +19,7 @@ object Simplifier:
 
   private def go(d: Def): Def = d match
     case DDef(x, t, v) => DDef(x, t, go(v, LIMIT)(Set.empty))
+    case d             => d
 
   @tailrec
   private def go(t: Tm, n: Int)(implicit scope: Set[Int]): Tm =
@@ -39,8 +41,13 @@ object Simplifier:
 
     case Lam(x, t1, t2, b) => go(b)(scope + x).map(b => Lam(x, t1, t2, b))
 
-    case Fix(g, x, t1, t2, b) =>
-      go(b)(scope + g + x).map(b => Fix(g, x, t1, t2, b))
+    case Fix(g, x, t1, t2, b, arg) =>
+      go(arg) match
+        case Some(arg) =>
+          go(b)(scope + g + x) match
+            case Some(b) => Some(Fix(g, x, t1, t2, b, arg))
+            case None    => Some(Fix(g, x, t1, t2, b, arg))
+        case None => go(b)(scope + g + x).map(b => Fix(g, x, t1, t2, b, arg))
 
     case App(Let(x, t, v, b), a) =>
       if scope.contains(x) then
@@ -48,16 +55,7 @@ object Simplifier:
         Some(Let(y, t, v, App(b.subst(Map(x -> Local(y, t)), scope), a)))
       else Some(Let(x, t, v, App(b, a)))
     case App(Lam(x, t1, t2, b), a) => Some(Let(x, TDef(t1), a, b))
-    case App(App(App(FoldNat(t), n), z), s) if n.toInt.isDefined =>
-      var m = n.toInt.get
-      var c: Tm = z
-      var k: Tm = Z
-      while (m > 0) do
-        m -= 1
-        c = App(App(s, k), c)
-        k = S(k)
-      Some(c)
-    case App(f, a) => go2(f, a).map(App.apply)
+    case App(f, a)                 => go2(f, a).map(App.apply)
 
     case Pair(t1, t2, fst, snd)     => go2(fst, snd).map(Pair(t1, t2, _, _))
     case Fst(_, Pair(_, _, fst, _)) => Some(fst)
@@ -65,14 +63,14 @@ object Simplifier:
     case Fst(ty, t)                 => go(t).map(Fst(ty, _))
     case Snd(ty, t)                 => go(t).map(Snd(ty, _))
 
-    case Z          => None
-    case S(n)       => go(n).map(S.apply)
-    case FoldNat(t) => None
-
     case True  => None
     case False => None
 
     case IntLit(_) => None
+    case Binop(op, a, b) =>
+      binop(op, a, b) match
+        case Some(t) => Some(t)
+        case None    => go2(a, b).map(Binop(op, _, _))
 
     case If(t, True, a, b)  => Some(a)
     case If(t, False, a, b) => Some(b)
@@ -98,12 +96,59 @@ object Simplifier:
             case None         => Some(If(t, c, a, b))
         case None => go2(a, b).map(If(t, c, _, _))
 
+    case Con(x, t, as0) =>
+      orL(go, as0.map(_._1)).map(as =>
+        Con(
+          x,
+          t,
+          (0 until as.size).map(i => (as(i), as0(i)._2, as0(i)._3)).toList
+        )
+      )
+
+    case Case(Con(c, ct, as), ty, cs) =>
+      ??? // Some(cs.find((y, _, b) => y == c).get._2)
+    case Case(t, TDef(ps, rt), cs) if ps.nonEmpty => ???
+    case Case(t, ty, cs)                          => ???
+    /*go(t) match
+        case Some(t) => Some(Case(t, ty, cs))
+        case None =>
+          orL(go, cs.map(_._2)).map(csb =>
+            Case(t, ty, (0 until cs.size).map(i => (cs(i)._1, csb(i))).toList)
+          )*/
+
+  private def binop(op: Op, a: Tm, b: Tm): Option[Tm] = (op, a, b) match
+    case (OAdd, IntLit(a), IntLit(b)) => Some(IntLit(a + b))
+    case (OAdd, IntLit(0), b)         => Some(b)
+    case (OAdd, b, IntLit(0))         => Some(b)
+    case (OMul, IntLit(a), IntLit(b)) => Some(IntLit(a * b))
+    case (OMul, x, IntLit(1))         => Some(x)
+    case (OMul, IntLit(1), x)         => Some(x)
+    case (OMul, x, IntLit(0))         => Some(IntLit(0))
+    case (OMul, IntLit(0), x)         => Some(IntLit(0))
+    case (OSub, IntLit(a), IntLit(b)) => Some(IntLit(a - b))
+    case (OSub, x, IntLit(0))         => Some(x)
+    case (ODiv, IntLit(a), IntLit(b)) => Some(IntLit(a / b))
+    case (ODiv, x, IntLit(1))         => Some(x)
+    case (OMod, IntLit(a), IntLit(b)) => Some(IntLit(a % b))
+    case (OEq, IntLit(a), IntLit(b))  => Some(if a == b then True else False)
+    case (ONeq, IntLit(a), IntLit(b)) => Some(if a != b then True else False)
+    case (OGt, IntLit(a), IntLit(b))  => Some(if a > b then True else False)
+    case (OLt, IntLit(a), IntLit(b))  => Some(if a < b then True else False)
+    case (OGeq, IntLit(a), IntLit(b)) => Some(if a >= b then True else False)
+    case (OLeq, IntLit(a), IntLit(b)) => Some(if a <= b then True else False)
+    case _                            => None
+
   private def go2(a: Tm, b: Tm)(implicit scope: Set[Int]): Option[(Tm, Tm)] =
     (go(a), go(b)) match
       case (None, None)       => None
       case (Some(a), None)    => Some((a, b))
       case (None, Some(b))    => Some((a, b))
       case (Some(a), Some(b)) => Some((a, b))
+
+  def orL[A](f: A => Option[A], l: List[A]): Option[List[A]] =
+    val l1 = l.map(x => (x, f(x)))
+    if l1.forall((_, o) => o.isEmpty) then None
+    else Some(l1.map((x, o) => o.getOrElse(x)))
 
   private def fresh(implicit scope: Set[Int]): Int =
     if scope.isEmpty then 0 else scope.max + 1

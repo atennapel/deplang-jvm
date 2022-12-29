@@ -1,0 +1,13 @@
+data B := T | F;
+
+not : B -> B := \b.
+  case b
+  | T => F
+  | F => T;
+
+toInt : B -> Int := \b.
+  case b
+  | T => 1
+  | F => 0;
+
+main : Int -> Int := \_. toInt (not T);

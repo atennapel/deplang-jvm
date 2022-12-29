@@ -28,7 +28,8 @@ object Parser:
         "if",
         "then",
         "else",
-        "fix"
+        "fix",
+        "data"
       ),
       operators = Set(
         "=",
@@ -43,7 +44,9 @@ object Parser:
         "^",
         "`",
         "$",
-        "_"
+        "_",
+        "|",
+        "=>"
       ),
       identStart = Predicate(_.isLetter),
       identLetter =
@@ -72,7 +75,7 @@ object Parser:
 
   object TmParser:
     import parsley.expr.{precedence, Ops, InfixL, InfixR, Prefix, Postfix}
-    import parsley.combinator.{many, some, option, sepEndBy}
+    import parsley.combinator.{many, some, option, sepEndBy, sepBy}
     import parsley.Parsley.pos
 
     import LangLexer.{ident as ident0, userOp as userOp0, natural}
@@ -110,7 +113,7 @@ object Parser:
     private val hole = Hole(None)
 
     lazy val tm: Parsley[Tm] = positioned(
-      attempt(piSigma) <|> ifP <|> let <|> lam <|> fix <|>
+      attempt(piSigma) <|> ifP <|> caseP <|> let <|> lam <|> fix <|>
         precedence[Tm](app)(
           Ops(InfixR)("**" #> ((l, r) => Sigma(DontBind, l, r))),
           Ops(InfixR)("->" #> ((l, r) => Pi(DontBind, Expl, l, r)))
@@ -163,6 +166,15 @@ object Parser:
           .map { case ((c, t), f) => If(c, t, f) }
       )
 
+    private lazy val caseP: Parsley[Tm] =
+      positioned(
+        ("case" *> tm <~> many(
+          "|" *> identOrOp <~> many(bind) <~> "=>" *> tm
+        )).map((scrut, cs) =>
+          Case(scrut, cs.map { case ((x, xs), b) => (x, xs, b) })
+        )
+      )
+
     private lazy val lam: Parsley[Tm] =
       positioned(
         ("\\" *> many(lamParam) <~> "." *> tm).map((xs, b) =>
@@ -175,9 +187,12 @@ object Parser:
         bind.map(x => (x, Expl))
 
     private lazy val fix: Parsley[Tm] =
-      positioned(("fix" *> identOrOp <~> identOrOp <~> "." *> tm).map {
-        case ((go, x), b) => Fix(go, x, b)
-      })
+      positioned(
+        ("fix" *> "(" *> identOrOp <~> identOrOp <~> "." *> tm <~> ")" *> atom)
+          .map { case (((go, x), b), a) =>
+            Fix(go, x, b, a)
+          }
+      )
 
     private lazy val app: Parsley[Tm] =
       precedence[Tm](appAtom)(
@@ -243,15 +258,23 @@ object Parser:
     lazy val defsP: Parsley[Defs] = sepEndBy(defP, ";").map(Defs.apply)
 
     private lazy val defP: Parsley[Def] =
-      (identOrOp <~> option(
-        ":" *> tm
-      ) <~> ("=" #> Var(Name("U1")) <|> ":=" #> App(
-        Var(Name("U0")),
-        Var(Name("Fun")),
-        Expl
-      ) <|> "::=" #> App(Var(Name("U0")), Var(Name("Val")), Expl))
-        <~> tm).map { case (((x, ot), univ), v) =>
-        DDef(x, univ, ot, v)
-      }
+      ddata <|>
+        (identOrOp <~> option(
+          ":" *> tm
+        ) <~> ("=" #> Var(Name("U1")) <|> ":=" #> App(
+          Var(Name("U0")),
+          Var(Name("Fun")),
+          Expl
+        ) <|> "::=" #> App(Var(Name("U0")), Var(Name("Val")), Expl))
+          <~> tm).map { case (((x, ot), univ), v) =>
+          DDef(x, univ, ot, v)
+        }
+
+    lazy val ddata: Parsley[Def] =
+      ("data" *> identOrOp <~> many(identOrOp) <~> ":=" *> sepBy(
+        identOrOp <~> many(atom),
+        "|"
+      ))
+        .map { case ((x, tvs), cons) => DData(x, tvs, cons) }
 
   lazy val parser: Parsley[Defs] = LangLexer.fully(TmParser.defsP)

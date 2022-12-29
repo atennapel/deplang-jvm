@@ -1,0 +1,5 @@
+data List := Nil | (::) Int List;
+
+test ::= 0 :: Nil;
+
+main : Int -> Int := \_. 0; 

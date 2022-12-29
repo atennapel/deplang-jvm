@@ -39,18 +39,6 @@ object Pretty:
     case App(f, a, Impl) => s"${prettyApp(f)} {${pretty(a)}}"
     case f               => prettyParen(f)
 
-  private def toNat(tm: Tm): Option[Int] = tm match
-    case Z    => Some(0)
-    case S(n) => toNat(n).map(_ + 1)
-    case _    => None
-
-  private def prettyNat(tm: Tm)(implicit ns: List[Name]): String =
-    def goPretty(tm: Tm): String = tm match
-      case Z    => "Z"
-      case S(n) => s"S ${prettyParen(n)}"
-      case t    => pretty(t)
-    toNat(tm).fold(goPretty(tm))(_.toString)
-
   private def prettyParen(tm: Tm, app: Boolean = false)(implicit
       ns: List[Name]
   ): String = tm match
@@ -62,23 +50,20 @@ object Pretty:
     case U0                  => pretty(tm)
     case U1                  => pretty(tm)
     case App(_, _, _) if app => pretty(tm)
-    case S(_) if app         => pretty(tm)
-    case S(_)                => toNat(tm).fold(s"(${pretty(tm)})")(n => s"$n")
     case Lift(_, _)          => pretty(tm)
     case Quote(_)            => pretty(tm)
     case Splice(_)           => pretty(tm)
-    case Nat                 => pretty(tm)
-    case Z                   => pretty(tm)
     case Bool                => pretty(tm)
     case True                => pretty(tm)
     case False               => pretty(tm)
     case IntTy               => pretty(tm)
     case IntLit(v)           => pretty(tm)
-    case FoldNat(t) if app   => pretty(tm)
     case Pair(_, _)          => pretty(tm)
     case Proj(_, _)          => pretty(tm)
     case Meta(_)             => pretty(tm)
     case InsertedMeta(_, _)  => pretty(tm)
+    case TCon(x, Nil)        => pretty(tm)
+    case Con(x, _, Nil)      => pretty(tm)
     case Wk(t)               => prettyParen(t, app)(ns.tail)
     case _                   => s"(${pretty(tm)})"
 
@@ -107,10 +92,10 @@ object Pretty:
     case Pi(_, _, _, _, _, _) => prettyPi(tm)
     case Lam(_, _, _)         => prettyLam(tm)
     case App(_, _, _)         => prettyApp(tm)
-    case Fix(go0, x0, b) =>
+    case Fix(go0, x0, b, arg) =>
       val go = go0.fresh
       val x = x0.fresh(go :: ns)
-      s"fix $go $x. ${pretty(b)(x :: go :: ns)}"
+      s"fix ($go $x. ${pretty(b)(x :: go :: ns)}) ${prettyParen(arg)}"
 
     case Sigma(_, _, _, _, _) => prettySigma(tm)
     case Proj(tm, proj)       => s"${prettyParen(tm)}$proj"
@@ -124,11 +109,6 @@ object Pretty:
 
     case Wk(t) => pretty(t)(ns.tail)
 
-    case Nat        => "Nat"
-    case Z          => prettyNat(tm)
-    case S(_)       => prettyNat(tm)
-    case FoldNat(t) => s"foldNat {${pretty(t)}}"
-
     case Bool  => "Bool"
     case True  => "True"
     case False => "False"
@@ -139,8 +119,33 @@ object Pretty:
     case IntLit(v)       => s"$v"
     case Binop(op, a, b) => s"$a $op $b"
 
+    case TCon(x, Nil) => s"$x"
+    case TCon(x, as)  => s"$x ${as.map(prettyParen(_)).mkString(" ")}"
+
+    case Con(x, _, Nil) => s"$x"
+    case Con(x, _, as) =>
+      s"$x ${as.map((t, _, _) => prettyParen(t)).mkString(" ")}"
+    case Case(x, _, _, cs) =>
+      s"case ${prettyParen(x)} | ${cs
+          .map((c, xs, b) => {
+            val (ys, ns2) = enter(xs.map(_._1))
+            s"$c ${ys.mkString(" ")} => ${pretty(b)(ns2)}"
+          })
+          .mkString(" | ")}"
+
     case Meta(id)            => s"?$id"
     case InsertedMeta(id, _) => s"?$id"
+
+  private def enter(xs: List[Bind])(implicit
+      ns: List[Name]
+  ): (List[Bind], List[Name]) =
+    def go(xs: List[Bind], ns: List[Name]): (List[Bind], List[Name]) = xs match
+      case Nil => (Nil, ns)
+      case x :: xs =>
+        val y = x.fresh(ns)
+        val (ys, ns2) = go(xs, y.toName :: ns)
+        (y :: ys, ns2)
+    go(xs, ns)
 
   def pretty(d: Def)(implicit ns: List[Name]): String = d match
     case DDef(x0, u, t, v) =>
@@ -151,6 +156,15 @@ object Pretty:
         case U1                   => ""
         case _                    => "?"
       s"$x : ${pretty(t)} $s= ${pretty(v)(x :: ns)};"
+    case DData(x, ps, cs) =>
+      s"data $x${if ps.isEmpty then "" else s" ${ps.mkString(" ")}"} := ${cs
+          .map((x, ts) =>
+            s"$x${
+                if ts.isEmpty then ""
+                else s" ${ts.map(prettyParen(_)(ps.reverse ++ (x :: ns))).mkString(" ")}"
+              }"
+          )
+          .mkString(" | ")};"
 
   def pretty(ds: Defs)(implicit ns: List[Name]): String =
     ds.toList.map(pretty).mkString("\n")

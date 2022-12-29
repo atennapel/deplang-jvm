@@ -40,9 +40,13 @@ TODO:
 - [x] Bool type with if expression
 - [x] Allow if to return lambdas
 - [x] Fixpoint
-- [ ] Add Int and primitive binops
-- [ ] Remove Nat
-- [ ] Tail recursion
+- [x] Add Int and primitive binops
+- [x] Remove Nat
+- [x] Tail recursion
 - [ ] Datatypes
+  - [x] Constructors
+  - [ ] Elimination
 - [ ] More simplification: case-of-case, app and case commutation
 - [ ] Better inlining (inline linear lambdas, constants, globals)
+- [ ] Combine jumps (for example if+comparisons)
+- [ ] Way to monomorphize datatypes on demand (staged datatypes?)

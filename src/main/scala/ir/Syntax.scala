@@ -4,16 +4,19 @@ import common.Common.*
 
 object Syntax:
   enum Ty:
-    case TNat
     case TBool
     case TInt
     case TPair(fst: Ty, snd: Ty)
+    case TCon(name: Name, args: List[Ty])
+    case TPoly
 
     override def toString: String = this match
-      case TNat            => "Nat"
       case TBool           => "Bool"
       case TInt            => "Int"
       case TPair(fst, snd) => s"($fst ** $snd)"
+      case TCon(x, Nil)    => s"$x"
+      case TCon(x, as)     => s"($x ${as.mkString(" ")})"
+      case TPoly           => "Poly"
   export Ty.*
 
   final case class TDef(params: List[Ty], retrn: Ty):
@@ -30,23 +33,26 @@ object Syntax:
     case Let(name: Int, ty: TDef, value: Tm, body: Tm)
 
     case Lam(name: Int, t1: Ty, t2: TDef, body: Tm)
-    case Fix(go: Int, name: Int, t1: Ty, t2: TDef, body: Tm)
+    case Fix(go: Int, name: Int, t1: Ty, t2: TDef, body: Tm, arg: Tm)
     case App(fn: Tm, arg: Tm)
 
     case Pair(t1: Ty, t2: Ty, fst: Tm, snd: Tm)
     case Fst(ty: Ty, tm: Tm)
     case Snd(ty: Ty, tm: Tm)
 
-    case Z
-    case S(n: Tm)
-    case FoldNat(ty: Ty)
-
     case True
     case False
     case If(ty: TDef, cond: Tm, ifTrue: Tm, ifFalse: Tm)
 
     case IntLit(value: Int)
-    case Binop()
+    case Binop(op: Op, left: Tm, right: Tm)
+
+    case Con(name: Name, ty: Ty, args: List[(Tm, Ty, Boolean)])
+    case Case(
+        scrut: Tm,
+        ty: TDef,
+        cases: List[(Name, List[(Int, Ty, Boolean)], Tm)]
+    )
 
     override def toString: String = this match
       case Local(x, _)  => s"'$x"
@@ -54,23 +60,26 @@ object Syntax:
       case Let(x, t, v, b) =>
         s"(let '$x : $t = $v in $b)"
 
-      case Lam(x, _, _, b)     => s"(\\'$x. $b)"
-      case Fix(go, x, _, _, b) => s"(fix '$go '$x. $b)"
-      case App(f, a)           => s"($f $a)"
+      case Lam(x, _, _, b)          => s"(\\'$x. $b)"
+      case Fix(go, x, _, _, b, arg) => s"(fix ('$go '$x. $b) $arg)"
+      case App(f, a)                => s"($f $a)"
 
       case Pair(_, _, fst, snd) => s"($fst, $snd)"
       case Fst(_, t)            => s"(fst $t)"
       case Snd(_, t)            => s"(snd $t)"
 
-      case Z          => "Z"
-      case S(n)       => s"(S $n)"
-      case FoldNat(t) => s"(foldNat {$t})"
-
       case True           => "True"
       case False          => "False"
       case If(_, c, a, b) => s"(if $c then $a else $b)"
 
-      case IntLit(n) => s"$n"
+      case IntLit(n)       => s"$n"
+      case Binop(op, a, b) => s"($a $op $b)"
+
+      case Con(x, _, Nil) => s"$x"
+      case Con(x, _, as)  => s"($x ${as.map(_._1).mkString(" ")})"
+
+      case Case(x, _, cs) =>
+        s"(case $x | ${cs.map((c, xs, b) => s"$c ${xs.map((x, _, _) => s"'$x")} => $b").mkString(" | ")})"
 
     def flattenLams: (List[(Int, Ty)], Option[Ty], Tm) =
       def go(t: Tm): (List[(Int, Ty)], Option[Ty], Tm) = t match
@@ -99,17 +108,28 @@ object Syntax:
         v.freeVars ++ b.freeVars.filterNot((y, _) => x == y)
 
       case Lam(x, _, _, b) => b.freeVars.filterNot((y, _) => x == y)
-      case Fix(go, x, _, _, b) =>
-        b.freeVars.filterNot((y, _) => x == y || go == y)
+      case Fix(go, x, _, _, b, arg) =>
+        b.freeVars.filterNot((y, _) => x == y || go == y) ++ arg.freeVars
       case App(f, a) => f.freeVars ++ a.freeVars
 
       case Pair(_, _, fst, snd) => fst.freeVars ++ snd.freeVars
       case Fst(_, t)            => t.freeVars
       case Snd(_, t)            => t.freeVars
 
-      case S(n) => n.freeVars
-
       case If(_, c, a, b) => c.freeVars ++ a.freeVars ++ b.freeVars
+
+      case Binop(_, a, b) => a.freeVars ++ b.freeVars
+
+      case Con(_, _, as) =>
+        as.foldLeft[List[(Int, TDef)]](Nil) { case (fv, (t, _, _)) =>
+          fv ++ t.freeVars
+        }
+
+      case Case(a, _, cs) =>
+        a.freeVars ++ cs.foldLeft[List[(Int, TDef)]](Nil) {
+          case (fv, (_, xs, t)) =>
+            fv ++ t.freeVars.filterNot((y, _) => xs.exists((x, _, _) => x == y))
+        }
 
       case _ => Nil
 
@@ -136,9 +156,18 @@ object Syntax:
         Lam(y, t1, t2, b.subst(sub + (x -> Local(y, TDef(t1))), scope + y))
       case App(f, a) => App(f.subst(sub, scope), a.subst(sub, scope))
 
-      case Fix(go, x, t1, t2, b) if !scope.contains(go) && !scope.contains(x) =>
-        Fix(go, x, t1, t2, b.subst(sub - go - x, scope + go + x))
-      case Fix(go, x, t1, t2, b) if scope.contains(go) && !scope.contains(x) =>
+      case Fix(go, x, t1, t2, b, arg)
+          if !scope.contains(go) && !scope.contains(x) =>
+        Fix(
+          go,
+          x,
+          t1,
+          t2,
+          b.subst(sub - go - x, scope + go + x),
+          arg.subst(sub, scope)
+        )
+      case Fix(go, x, t1, t2, b, arg)
+          if scope.contains(go) && !scope.contains(x) =>
         val go2 = scope.max + 1
         Fix(
           go2,
@@ -148,9 +177,11 @@ object Syntax:
           b.subst(
             sub + (go -> Local(go2, TDef(t1, t2))),
             scope + go2
-          )
+          ),
+          arg.subst(sub, scope)
         )
-      case Fix(go, x, t1, t2, b) if !scope.contains(go) && scope.contains(x) =>
+      case Fix(go, x, t1, t2, b, arg)
+          if !scope.contains(go) && scope.contains(x) =>
         val x2 = scope.max + 1
         Fix(
           go,
@@ -160,9 +191,10 @@ object Syntax:
           b.subst(
             sub + (x -> Local(x2, TDef(t1))),
             scope + x2
-          )
+          ),
+          arg.subst(sub, scope)
         )
-      case Fix(go, x, t1, t2, b) =>
+      case Fix(go, x, t1, t2, b, arg) =>
         val go2 = scope.max + 1
         val x2 = (scope + go2).max + 1
         Fix(
@@ -173,7 +205,8 @@ object Syntax:
           b.subst(
             sub + (go -> Local(go2, TDef(t1, t2))) + (x -> Local(x2, TDef(t1))),
             scope + go2 + x2
-          )
+          ),
+          arg.subst(sub, scope)
         )
 
       case Pair(t1, t2, fst, snd) =>
@@ -181,17 +214,37 @@ object Syntax:
       case Fst(ty, tm) => Fst(ty, tm.subst(sub, scope))
       case Snd(ty, tm) => Snd(ty, tm.subst(sub, scope))
 
-      case S(n: Tm) => S(n.subst(sub, scope))
-
       case If(t, c, a, b) =>
         If(t, c.subst(sub, scope), a.subst(sub, scope), b.subst(sub, scope))
 
-      case _ => this
+      case Binop(op, a, b) =>
+        Binop(op, a.subst(sub, scope), b.subst(sub, scope))
 
-    def toInt: Option[Int] = this match
-      case Z    => Some(0)
-      case S(n) => n.toInt.map(_ + 1)
-      case _    => None
+      case Con(x, t, as) =>
+        Con(x, t, as.map((a, b, p) => (a.subst(sub, scope), b, p)))
+
+      case Case(scrut, ty, cs) =>
+        Case(
+          scrut.subst(sub, scope),
+          ty,
+          cs.map((x, xs, c) => {
+            def go(
+                xs: List[(Int, Ty)],
+                sub: Map[Int, Tm],
+                scope: Set[Int]
+            ): (Map[Int, Tm], Set[Int]) = xs match
+              case Nil => (sub, scope)
+              case (x, _) :: xs if !scope.contains(x) =>
+                go(xs, sub - x, scope + x)
+              case (x, t) :: xs =>
+                val y = scope.max + 1
+                go(xs, sub + (x -> Local(y, TDef(t))), scope + y)
+            val (sub2, scope2) = go(xs.map((x, t, _) => (x, t)), sub, scope)
+            (x, xs, c.subst(sub2, scope2))
+          })
+        )
+
+      case _ => this
   export Tm.*
 
   final case class Defs(defs: List[Def]):
@@ -201,7 +254,14 @@ object Syntax:
 
   enum Def:
     case DDef(name: Name, ty: TDef, value: Tm)
+    case DData(name: Name, params: List[Name], cases: List[(Name, List[Ty])])
 
     override def toString: String = this match
       case DDef(x, t, v) => s"$x : $t = $v;"
+      case DData(x, ps, cs) =>
+        s"data $x${if ps.isEmpty then "" else s" ${ps.mkString(" ")}"} := ${cs
+            .map((x, ts) =>
+              s"$x${if ts.isEmpty then "" else s" ${ts.mkString(" ")}"}"
+            )
+            .mkString(" | ")};"
   export Def.*

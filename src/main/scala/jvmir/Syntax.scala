@@ -4,16 +4,18 @@ import common.Common.*
 
 object Syntax:
   enum Ty:
-    case TNat
     case TBool
     case TInt
     case TPair
+    case TCon(name: Name)
+    case TObject
 
     override def toString: String = this match
-      case TNat  => "Nat"
-      case TBool => "Bool"
-      case TInt  => "Int"
-      case TPair => s"Pair"
+      case TBool   => "Bool"
+      case TInt    => "Int"
+      case TPair   => s"Pair"
+      case TCon(x) => s"$x"
+      case TObject => "Object"
   export Ty.*
 
   final case class TDef(params: List[Ty], retrn: Ty):
@@ -26,31 +28,32 @@ object Syntax:
   enum Tm:
     case Arg(ix: Int, ty: Ty)
     case Local(name: Int, ty: Ty)
-    case Global(name: Name, ty: TDef, args: List[Tm])
+    case Global(name: Name, tailRecursive: Boolean, ty: TDef, args: List[Tm])
     case Let(name: Int, ty: Ty, value: Tm, body: Tm)
 
     case Pair(fst: Tm, snd: Tm)
     case Fst(tm: Tm)
     case Snd(tm: Tm)
 
-    case Z
-    case S(n: Tm)
-    case FoldNat(ty: Ty, n: Tm, z: Tm, x1: Int, x2: Int, s: Tm)
-
     case True
     case False
     case If(ty: Ty, cond: Tm, ifTrue: Tm, ifFalse: Tm)
 
     case IntLit(value: Int)
+    case Binop(op: Op, left: Tm, right: Tm)
+
+    case Con(name: Name, ty: Ty, args: List[(Tm, Ty, Boolean)])
+    case Case(scrut: Tm, ty: Ty, cases: List[(Name, Tm)])
 
     case Box(ty: Ty, tm: Tm)
     case Unbox(ty: Ty, tm: Tm)
 
     override def toString: String = this match
-      case Arg(ix, _)        => s"'arg$ix"
-      case Local(x, _)       => s"'$x"
-      case Global(x, _, Nil) => s"$x"
-      case Global(x, _, as)  => s"$x(${as.mkString(", ")})"
+      case Arg(ix, _)            => s"'arg$ix"
+      case Local(x, _)           => s"'$x"
+      case Global(x, tr, _, Nil) => s"$x${if tr then "{tr}" else ""}"
+      case Global(x, tr, _, as) =>
+        s"$x${if tr then "{tr}" else ""}(${as.mkString(", ")})"
       case Let(x, t, v, b) =>
         s"(let '$x : $t = $v in $b)"
 
@@ -58,24 +61,21 @@ object Syntax:
       case Fst(t)         => s"(fst $t)"
       case Snd(t)         => s"(snd $t)"
 
-      case Z    => "Z"
-      case S(n) => s"(S $n)"
-      case FoldNat(t, n, z, x1, x2, s) =>
-        s"(foldNat {$t} $n $z ('$x1 '$x2. $s))"
-
       case True           => "True"
       case False          => "False"
       case If(_, c, a, b) => s"(if $c then $a else $b)"
 
-      case IntLit(n) => s"$n"
+      case IntLit(n)       => s"$n"
+      case Binop(op, a, b) => s"($a $op $b)"
+
+      case Con(x, _, Nil) => s"$x"
+      case Con(x, _, as)  => s"($x ${as.map(_._1).mkString(" ")})"
+
+      case Case(x, _, cs) =>
+        s"(case $x | ${cs.map((c, b) => s"$c => $b").mkString(" | ")})"
 
       case Box(ty, tm)   => s"(box {$ty} $tm)"
       case Unbox(ty, tm) => s"(unbox {$ty} $tm)"
-
-    def toInt: Option[Int] = this match
-      case Z    => Some(0)
-      case S(n) => n.toInt.map(_ + 1)
-      case _    => None
   export Tm.*
 
   final case class Defs(defs: List[Def]):
@@ -91,10 +91,17 @@ object Syntax:
         retrn: Ty,
         value: Tm
     )
+    case DData(name: Name, cases: List[(Name, List[Ty])])
 
     override def toString: String = this match
       case DDef(x, g, Nil, rt, v) =>
         s"${if g then "(gen) " else ""}$x : $rt = $v;"
       case DDef(x, g, ps, rt, v) =>
         s"${if g then "(gen) " else ""}$x (${ps.mkString(", ")}) : $rt = $v;"
+      case DData(x, cs) =>
+        s"data $x := ${cs
+            .map((x, ts) =>
+              s"$x${if ts.isEmpty then "" else s" ${ts.mkString(" ")}"}"
+            )
+            .mkString(" | ")};"
   export Def.*

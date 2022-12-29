@@ -1,1 +1,16 @@
-n ::= 1 + 2;
+fac : Int -> Int := \n.
+  let facR : Int -> Int := fix (go n. \acc.
+    if n < 2 then acc
+    else go (n - 1) (acc * n)) n in
+  facR 1;
+
+fold : {A : U0 Val} -> Int -> A -> (Int -> A -> A) -> A =
+  \{A} n z s.
+    `(let foldR : A -> A := fix (go c. \acc.
+      if c <= 0 then acc
+      else go (c - 1) (s c acc)) n in
+    foldR z);
+
+add : Int -> Int -> Int := \a b. fold a b (\_ n. n + 1);
+
+main : Int -> Int := \_. fac 3;

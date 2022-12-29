@@ -2,6 +2,8 @@ package core
 
 import common.Common.*
 
+import scala.annotation.tailrec
+
 object Syntax:
   enum ProjType:
     case Fst
@@ -30,7 +32,7 @@ object Syntax:
     case Pi(name: Bind, icit: Icit, ty: Ty, u1: Ty, body: Ty, u2: Ty)
     case Lam(name: Bind, icit: Icit, body: Tm)
     case App(fn: Tm, arg: Tm, icit: Icit)
-    case Fix(go: Name, name: Name, body: Tm)
+    case Fix(go: Name, name: Name, body: Tm, arg: Tm)
 
     case Sigma(name: Bind, ty: Ty, u1: Ty, body: Ty, u2: Ty)
     case Proj(tm: Tm, proj: ProjType)
@@ -42,11 +44,6 @@ object Syntax:
 
     case Wk(tm: Tm)
 
-    case Nat
-    case Z
-    case S(n: Tm)
-    case FoldNat(ty: Ty)
-
     case Bool
     case True
     case False
@@ -55,6 +52,15 @@ object Syntax:
     case IntTy
     case IntLit(value: Int)
     case Binop(op: Op, left: Tm, right: Tm)
+
+    case TCon(name: Name, args: List[Tm])
+    case Con(name: Name, ty: Ty, args: List[(Tm, Ty, Boolean)])
+    case Case(
+        scrut: Tm,
+        ty: Ty,
+        vf: Ty,
+        cases: List[(Name, List[(Bind, Ty, Boolean)], Tm)]
+    )
 
     case Meta(id: MetaId)
     case InsertedMeta(id: MetaId, bds: BDs)
@@ -84,7 +90,7 @@ object Syntax:
       case Lam(x, Impl, b)                   => s"(\\{$x}. $b)"
       case App(f, a, Expl)                   => s"($f $a)"
       case App(f, a, Impl)                   => s"($f {$a})"
-      case Fix(go, x, b)                     => s"(fix $go $x. $b)"
+      case Fix(go, x, b, arg)                => s"(fix ($go $x. $b) $arg)"
 
       case Sigma(DontBind, t, u1, b, u2)  => s"($t **{$u1}{$u2} $b)"
       case Sigma(DoBind(x), t, u1, b, u2) => s"(($x : $t) **{$u1}{$u2} $b)"
@@ -97,11 +103,6 @@ object Syntax:
 
       case Wk(t) => s"(Wk $t)"
 
-      case Nat        => "Nat"
-      case Z          => "Z"
-      case S(n)       => s"(S $n)"
-      case FoldNat(t) => s"(foldNat {$t})"
-
       case Bool           => "Bool"
       case True           => "True"
       case False          => "False"
@@ -110,6 +111,14 @@ object Syntax:
       case IntTy           => "Int"
       case IntLit(v)       => s"$v"
       case Binop(op, a, b) => s"($a $op $b)"
+
+      case TCon(x, Nil) => s"$x"
+      case TCon(x, as)  => s"($x ${as.mkString(" ")})"
+      case Case(x, _, _, cs) =>
+        s"(case $x | ${cs.map((c, xs, b) => s"$c ${xs.map(_._1).mkString(" ")} => $b").mkString(" | ")})"
+
+      case Con(x, _, Nil) => s"$x"
+      case Con(x, _, as)  => s"($x ${as.map(_._1).mkString(" ")})"
 
       case Meta(id)            => s"?$id"
       case InsertedMeta(id, _) => s"?$id"
@@ -122,6 +131,11 @@ object Syntax:
     case Quote(t) => t
     case t        => Splice(t)
 
+  @tailrec
+  def wk(n: Int, t: Tm): Tm = n match
+    case 0 => t
+    case n => wk(n - 1, Wk(t))
+
   final case class Defs(defs: List[Def]):
     override def toString: String = defs.mkString("\n")
 
@@ -129,10 +143,17 @@ object Syntax:
 
   enum Def:
     case DDef(name: Name, vf: Ty, ty: Ty, value: Tm)
+    case DData(name: Name, params: List[Name], cases: List[(Name, List[Ty])])
 
     override def toString: String = this match
-      case DDef(x, App(U0, VFVal, Expl), t, v) => s"$x : $t ::= $v"
-      case DDef(x, App(U0, VFFun, Expl), t, v) => s"$x : $t := $v"
-      case DDef(x, U1, t, v)                   => s"$x : $t = $v"
-      case DDef(x, _, t, v)                    => s"$x : $t ?= $v"
+      case DDef(x, App(U0, VFVal, Expl), t, v) => s"$x : $t ::= $v;"
+      case DDef(x, App(U0, VFFun, Expl), t, v) => s"$x : $t := $v;"
+      case DDef(x, U1, t, v)                   => s"$x : $t = $v;"
+      case DDef(x, _, t, v)                    => s"$x : $t ?= $v;"
+      case DData(x, ps, cs) =>
+        s"data $x${if ps.isEmpty then "" else s" ${ps.mkString(" ")}"} := ${cs
+            .map((x, ts) =>
+              s"$x${if ts.isEmpty then "" else s" ${ts.mkString(" ")}"}"
+            )
+            .mkString(" | ")};"
   export Def.*

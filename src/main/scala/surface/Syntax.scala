@@ -22,7 +22,7 @@ object Syntax:
     case Pi(name: Bind, icit: Icit, ty: Ty, body: Ty)
     case Lam(name: Bind, icit: Icit, body: Tm)
     case App(fn: Tm, arg: Tm, icit: Icit)
-    case Fix(go: Name, name: Name, body: Tm)
+    case Fix(go: Name, name: Name, body: Tm, arg: Tm)
 
     case Sigma(name: Bind, ty: Ty, body: Ty)
     case Proj(tm: Tm, proj: ProjType)
@@ -33,6 +33,7 @@ object Syntax:
     case Splice(tm: Tm)
 
     case If(cond: Tm, ifTrue: Tm, ifFalse: Tm)
+    case Case(scrut: Tm, cases: List[(Name, List[Bind], Tm)])
 
     case IntLit(value: Int)
 
@@ -64,7 +65,7 @@ object Syntax:
       case Lam(x, Impl, b)           => s"(\\{$x}. $b)"
       case App(f, a, Expl)           => s"($f $a)"
       case App(f, a, Impl)           => s"($f {$a})"
-      case Fix(go, x, b)             => s"(fix $go $x. $b)"
+      case Fix(go, x, b, arg)        => s"(fix ($go $x. $b) $arg)"
 
       case Lift(t)   => s"^$t"
       case Quote(t)  => s"`$t"
@@ -76,6 +77,10 @@ object Syntax:
       case Pair(fst, snd)         => s"($fst, $snd)"
 
       case If(c, a, b) => s"(if $c then $a else $b)"
+      case Case(x, cs) =>
+        s"(case $x | ${cs.map((c, xs, b) => s"$c ${xs.mkString(" ")} => $b").mkString(" | ")})"
+
+      case IntLit(n) => s"$n"
 
       case IntLit(n) => s"$n"
 
@@ -92,10 +97,10 @@ object Syntax:
       case Let(x, s, t, v, b) =>
         Let(x, s, t.map(_.removePos), v.removePos, b.removePos)
 
-      case Pi(x, i, t, b) => Pi(x, i, t.removePos, b.removePos)
-      case Lam(x, i, b)   => Lam(x, i, b.removePos)
-      case App(f, a, i)   => App(f.removePos, a.removePos, i)
-      case Fix(go, x, b)  => Fix(go, x, b.removePos)
+      case Pi(x, i, t, b)     => Pi(x, i, t.removePos, b.removePos)
+      case Lam(x, i, b)       => Lam(x, i, b.removePos)
+      case App(f, a, i)       => App(f.removePos, a.removePos, i)
+      case Fix(go, x, b, arg) => Fix(go, x, b.removePos, arg.removePos)
 
       case Lift(t)   => Lift(t.removePos)
       case Quote(t)  => Quote(t.removePos)
@@ -106,6 +111,8 @@ object Syntax:
       case Pair(fst, snd) => Pair(fst.removePos, snd.removePos)
 
       case If(c, a, b) => If(c.removePos, a.removePos, b.removePos)
+      case Case(c, cs) =>
+        Case(c.removePos, cs.map((x, xs, t) => (x, xs, t.removePos)))
 
       case Pos(_, t) => t.removePos
 
@@ -119,6 +126,7 @@ object Syntax:
 
   enum Def:
     case DDef(name: Name, univ: Ty, ty: Option[Ty], value: Tm)
+    case DData(name: Name, params: List[Name], cases: List[(Name, List[Ty])])
 
     override def toString: String = this match
       case DDef(x, u, Some(t), v) =>
@@ -135,4 +143,10 @@ object Syntax:
           case Var(Name("U1"))                              => s""
           case _                                            => s"?"
         s"$x $s= $v;"
+      case DData(x, ps, cs) =>
+        s"data $x${if ps.isEmpty then "" else s" ${ps.mkString(" ")}"} := ${cs
+            .map((x, ts) =>
+              s"$x${if ts.isEmpty then "" else s" ${ts.mkString(" ")}"}"
+            )
+            .mkString(" | ")};"
   export Def.*

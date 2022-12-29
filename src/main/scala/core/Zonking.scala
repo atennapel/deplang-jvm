@@ -6,6 +6,8 @@ import Value.*
 import Evaluation.*
 import Metas.*
 
+import scala.annotation.tailrec
+
 object Zonking:
   private type VT = Either[Val, Tm]
 
@@ -65,8 +67,8 @@ object Zonking:
     case Pi(x, i, t, u1, b, u2) =>
       Pi(x, i, zonk(t), zonk(u1), zonkLift(b), zonk(u2))
     case Lam(x, i, b) => Lam(x, i, zonkLift(b))
-    case Fix(go, x, b) =>
-      Fix(go, x, zonk(b)(l + 2, VVar(l + 1) :: VVar(l) :: e))
+    case Fix(go, x, b, arg) =>
+      Fix(go, x, zonk(b)(l + 2, enterEnv(2, e)), zonk(arg))
 
     case Sigma(x, t, u1, b, u2) =>
       Sigma(x, zonk(t), zonk(u1), zonkLift(b), zonk(u2))
@@ -77,11 +79,6 @@ object Zonking:
 
     case Wk(t) => Wk(zonk(t)(l - 1, e.tail))
 
-    case Nat        => tm
-    case Z          => tm
-    case S(n)       => S(zonk(n))
-    case FoldNat(t) => FoldNat(zonk(t))
-
     case Bool           => tm
     case True           => tm
     case False          => tm
@@ -90,3 +87,26 @@ object Zonking:
     case IntTy           => tm
     case IntLit(v)       => tm
     case Binop(op, a, b) => Binop(op, zonk(a), zonk(b))
+
+    case TCon(x, as) => TCon(x, as.map(zonk))
+    case Con(x, t, as) =>
+      Con(x, zonk(t), as.map((a, b, p) => (zonk(a), zonk(b), p)))
+    case Case(scrut, ty, vf, cs) =>
+      Case(
+        zonk(scrut),
+        zonk(ty),
+        zonk(vf),
+        cs.map((x, xs, b) =>
+          (
+            x,
+            xs.map((x, t, b) => (x, zonk(t), b)),
+            zonk(b)(l + xs.size, enterEnv(xs.size, e))
+          )
+        )
+      )
+
+  @tailrec
+  private def enterEnv(n: Int, e: Env)(implicit l: Lvl): Env =
+    def go(k: Int, e: Env): Env =
+      if k == 0 then e else enterEnv(k - 1, VVar(l + (n - k)) :: e)
+    go(n, e)

@@ -2,7 +2,7 @@ package surface
 
 import common.Common.*
 import common.Debug.*
-import core.Syntax.{S as NatS, *}
+import core.Syntax.*
 import core.Value.*
 import core.Evaluation.*
 import core.Unification.{unify as unify0, UnifyError}
@@ -195,12 +195,6 @@ object Elaboration:
       case (S.Lam(x, i1, b), VPi(_, i2, t, u1, rt, u2)) if i1 == i2 =>
         val eb = check(b, rt(VVar(ctx.lvl)), u2)(ctx.bind(x, t, u1))
         Lam(x, i1, eb)
-      case (S.Fix(go, x, b), VPi(_, Expl, t, u1, rt, u2)) =>
-        unify(u1, VUVal())
-        val eb = check(b, rt(VVar(ctx.lvl + 1)), u2)(
-          ctx.bind(DoBind(go), ty, VUFun()).bind(DoBind(x), t, VUVal())
-        )
-        Fix(go, x, eb)
       case (tm, VPi(x, Impl, t, u1, rt, u2)) =>
         val etm = check(tm, rt(VVar(ctx.lvl)), u2)(ctx.bind(x, t, u1, true))
         Lam(x, Impl, etm)
@@ -252,6 +246,50 @@ object Elaboration:
           case VUFun() =>
           case _ => throw ElaborateError(s"if should return in U0 Val: $tm")
         If(ctx.quote(ty), ec, et, ef)
+
+      case (S.Fix(go, x, b, a), _) =>
+        val vf = force(univ) match
+          case VU(vf) => vf
+          case _      => throw ElaborateError(s"fix has to return in U0")
+        val (ea, vt) = infer(a, VUVal())
+        val fun = vpi("_", vt, VUVal(), univ, _ => ty)
+        val eb = check(b, ty, univ)(
+          ctx.bind(DoBind(go), fun, VUFun()).bind(DoBind(x), vt, VUVal())
+        )
+        Fix(go, x, eb, ea)
+
+      case (S.Case(scrut, cs), _) =>
+        force(univ) match
+          case VU1 => check(S.Quote(tm), ty, univ)
+          case VU(vf) =>
+            val (escrut, scrutty) = infer(scrut, VUVal())
+            val (x, as) = force(scrutty) match
+              case VTCon(x, as) => (x, as)
+              case _ =>
+                throw ElaborateError(
+                  s"expected type constructor in case $tm, but got: ${ctx.pretty(scrutty)}"
+                )
+            val ecs = cs.map((x, xs, b) =>
+              getCons(x) match
+                case None =>
+                  throw ElaborateError(s"undefined constructor name $x")
+                case Some(ConsEntry(_, args)) =>
+                  def go(ctx: Ctx, as: List[(Bind, VTy)]): Ctx = as match
+                    case Nil           => ctx
+                    case (x, vt) :: as => go(ctx.bind(x, vt, VUVal()), as)
+                  (
+                    x,
+                    xs.zip(args).map { case (x, (t, _, p)) => (x, t, p) },
+                    check(b, ty, VU(vf))(
+                      go(
+                        ctx,
+                        xs.zip(args).map { case (x, (_, vt, _)) => (x, vt) }
+                      )
+                    )
+                  )
+            )
+            Case(escrut, ctx.quote(ty), ctx.quote(vf), ecs)
+          case _ => throw ElaborateError(s"invalid universe in check")
 
       case (tm, _) =>
         val (etm, ty2, univ2) = insert(infer(tm))
@@ -313,24 +351,6 @@ object Elaboration:
       case S.Var(Name("False")) => (False, VBool, VUVal())
       case S.Var(Name("Int"))   => (IntTy, VUVal(), VU1)
       case S.IntLit(n)          => (IntLit(n), VInt, VUVal())
-      case S.Var(Name("Nat"))   => (Nat, VUVal(), VU1)
-      case S.Var(Name("Z"))     => (Z, VNat, VUVal())
-      case S.App(S.Var(Name("S")), n, Expl) =>
-        val en = check(n, VNat, VUVal())
-        (NatS(en), VNat, VUVal())
-      case S.Var(Name("S")) =>
-        val sty = vpi("_", VNat, VUVal(), VUVal(), _ => VNat)
-        (
-          Let(
-            Name("s"),
-            ctx.quote(VUFun()),
-            ctx.quote(sty),
-            Lam(DoBind(Name("x")), Expl, NatS(Local(ix0))),
-            Local(ix0)
-          ),
-          sty,
-          VUFun()
-        )
       case S.App(S.App(S.Var(Name("+")), a, Expl), b, Expl) =>
         val ea = check(a, VInt, VUVal()); val eb = check(b, VInt, VUVal())
         (Binop(OAdd, ea, eb), VInt, VUVal())
@@ -364,38 +384,6 @@ object Elaboration:
       case S.App(S.App(S.Var(Name(">=")), a, Expl), b, Expl) =>
         val ea = check(a, VInt, VUVal()); val eb = check(b, VInt, VUVal())
         (Binop(OGeq, ea, eb), VBool, VUVal())
-      /*
-      n : Nat
-      z : A
-      s : Nat -> A -> A
-      --------------------------------------
-      foldNat n z s ~> foldNat {A} n z s : A
-       */
-      case S.App(
-            S.App(S.App(S.Var(Name("foldNat")), n, Expl), z, Expl),
-            s,
-            Expl
-          ) =>
-        val en = check(n, VNat, VUVal())
-        val (ez, vt) = infer(z, VUVal())
-        val es = check(
-          s,
-          vpi(
-            "_",
-            VNat,
-            VUVal(),
-            VUFun(),
-            _ => vpi("_", vt, VUVal(), VUVal(), _ => vt)
-          ),
-          VUFun()
-        )
-        (
-          App(App(App(FoldNat(ctx.quote(vt)), en, Expl), ez, Expl), es, Expl),
-          vt,
-          VUVal()
-        )
-      case S.Var(Name("foldNat")) =>
-        throw ElaborateError(s"foldNat must be fully applied")
       case S.Var(x) =>
         ctx.lookup(x) match
           case Some((ix, ty, st)) => (Local(ix), ty, st)
@@ -511,6 +499,16 @@ object Elaboration:
         val ty = ctx.eval(newMeta())
         val tm = newMeta()
         (tm, ty, u)
+      case S.Fix(go, x, b, a) =>
+        val (ea, vt) = infer(a, VUVal())
+        val vf = ctx.eval(newMeta())
+        val u = VU(vf)
+        val rt = ctx.eval(newMeta())
+        val fun = vpi("_", vt, VUVal(), u, _ => rt)
+        val eb = check(b, rt, u)(
+          ctx.bind(DoBind(go), fun, VUFun()).bind(DoBind(x), vt, VUVal())
+        )
+        (Fix(go, x, eb, ea), rt, u)
       case _ => throw ElaborateError(s"cannot infer $tm")
 
   private def elaborate(tm: S.Tm, ty: Option[S.Ty], u: VTy): (Tm, Ty) =
@@ -531,7 +529,71 @@ object Elaboration:
         val eu = zonk(checkType(u, VU1)(Ctx.empty((0, 0))))(lvl0, Nil)
         val veu = eval(eu)(Nil)
         val (ev, et) = elaborate(v, t, veu)
+        debug(s"$x : $et = $ev")
         setGlobal(GlobalEntry(x, ev, et, eval(ev)(Nil), eval(et)(Nil), veu))
         DDef(x, eu, et, ev)
+      case S.DData(x, ps, cs) =>
+        val tconty =
+          ps.foldLeft(VUVal())((rt, _) => vpi("_", VUVal(), VU1, VU1, _ => rt))
+        val rt =
+          TCon(x, (0 until ps.size).reverse.map(i => Local(mkIx(i))).toList)
+        val lam = ps.foldRight(rt)((p, b) => Lam(DoBind(p), Expl, b))
+        val tcon =
+          setGlobal(
+            GlobalEntry(
+              x,
+              lam,
+              quote(tconty)(lvl0),
+              eval(lam)(Nil),
+              tconty,
+              VU1
+            )
+          )
+        implicit val ctx: Ctx =
+          ps.foldLeft(Ctx.empty((0, 0)))((ctx, p) =>
+            ctx.bind(DoBind(p), VUVal(), VU1)
+          )
+        val ecs = cs.map((c, ts) => {
+          if getCons(c).isDefined then
+            throw ElaborateError(s"duplicate constructor defined $c")
+          val ets = ts.map(t => {
+            val et = check(t, VUVal(), VU1)
+            zonk(et)(lvl0, Nil)
+          })
+          val ty1 = ets.foldRight(Lift(VFVal, rt))((p, rt) =>
+            Pi(DontBind, Expl, Lift(VFVal, p), U1, Wk(rt), U1)
+          )
+          val ty2 = ps.foldRight(ty1)((p, rt) =>
+            Pi(DoBind(p), Impl, quote(VUVal())(lvl0), U1, rt, U1)
+          )
+          val args = (0 until ets.size).reverse
+            .map(i => {
+              val tm = Splice(Local(mkIx(i)))
+              val ety = ets(ets.size - i - 1)
+              val ty = wk(ets.size, ety)
+              val poly = ety match
+                case Local(_) => true
+                case _        => false
+              (tm, ty, poly)
+            })
+            .toList
+          setCons(ConsEntry(c, args.map((_, t, p) => (t, eval(t)(Nil), p))))
+          val inner = Quote(
+            Con(
+              c,
+              wk(ets.size, rt),
+              args
+            )
+          )
+          val lam1 = (0 until ets.size).foldRight(inner)((i, b) =>
+            Lam(DoBind(Name(s"a$i")), Expl, b)
+          )
+          val lam2 = ps.foldRight(lam1)((p, b) => Lam(DoBind(p), Impl, b))
+          setGlobal(
+            GlobalEntry(c, lam2, ty2, eval(lam2)(Nil), eval(ty2)(Nil), VU1)
+          )
+          (c, ets)
+        })
+        DData(x, ps, ecs)
 
   def elaborate(ds: S.Defs): Defs = Defs(ds.toList.map(elaborate))
