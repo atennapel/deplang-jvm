@@ -61,6 +61,8 @@ object Value:
 
     case VInt
     case VIntLit(value: Int)
+
+    case VList(ty: VTy)
   export Val.*
 
   private def name(x: String): Bind =

@@ -318,6 +318,16 @@ object Elaboration:
       case S.Var(Name("False")) => (False, VBool, VUVal())
       case S.Var(Name("Int"))   => (IntTy, VUVal(), VU1)
       case S.IntLit(n)          => (IntLit(n), VInt, VUVal())
+      case S.App(S.Var(Name("List")), t, Expl) =>
+        val et = check(t, VUVal(), VU1)
+        (ListTy(et), VUVal(), VU1)
+      case S.Var(Name("List")) =>
+        // \A. List A : U0 Val -> U0 Val : U1
+        (
+          Lam(DoBind(Name("A")), Expl, ListTy(Local(ix0))),
+          vpi("_", VUVal(), VU1, VU1, _ => VUVal()),
+          VU1
+        )
       case S.App(S.App(S.Var(Name("+")), a, Expl), b, Expl) =>
         val ea = check(a, VInt, VUVal()); val eb = check(b, VInt, VUVal())
         (Binop(OAdd, ea, eb), VInt, VUVal())

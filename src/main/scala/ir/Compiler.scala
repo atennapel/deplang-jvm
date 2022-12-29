@@ -110,7 +110,7 @@ object Compiler:
 
   private def box(ty: Ty, tm: IR.Tm): IR.Tm = ty match
     case TPair(_, _) => tm
-    case TPoly       => tm
+    case TList(_)    => tm
     case _ =>
       val ct = go(ty)
       tm match
@@ -120,7 +120,7 @@ object Compiler:
 
   private def unbox(ty: Ty, tm: IR.Tm): IR.Tm = ty match
     case TPair(_, _) => tm
-    case TPoly       => tm
+    case TList(_)    => tm
     case _ =>
       val ct = go(ty)
       tm match
@@ -132,7 +132,7 @@ object Compiler:
     case TBool       => IR.TBool
     case TInt        => IR.TInt
     case TPair(_, _) => IR.TPair
-    case TPoly       => IR.TObject
+    case TList(_)    => IR.TList
 
   private def go(t: TDef): IR.TDef = t match
     case TDef(ps, rt) => IR.TDef(ps.map(go), go(rt))

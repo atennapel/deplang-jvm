@@ -50,6 +50,7 @@ object Pretty:
     case U0                  => pretty(tm)
     case U1                  => pretty(tm)
     case App(_, _, _) if app => pretty(tm)
+    case ListTy(t) if app    => pretty(tm)
     case Lift(_, _)          => pretty(tm)
     case Quote(_)            => pretty(tm)
     case Splice(_)           => pretty(tm)
@@ -116,6 +117,8 @@ object Pretty:
     case IntTy           => "Int"
     case IntLit(v)       => s"$v"
     case Binop(op, a, b) => s"$a $op $b"
+
+    case ListTy(t) => s"List ${prettyParen(t)}"
 
     case Meta(id)            => s"?$id"
     case InsertedMeta(id, _) => s"?$id"

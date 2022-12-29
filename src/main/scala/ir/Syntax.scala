@@ -7,13 +7,13 @@ object Syntax:
     case TBool
     case TInt
     case TPair(fst: Ty, snd: Ty)
-    case TPoly
+    case TList(ty: Ty)
 
     override def toString: String = this match
       case TBool           => "Bool"
       case TInt            => "Int"
       case TPair(fst, snd) => s"($fst ** $snd)"
-      case TPoly           => "Poly"
+      case TList(t)        => s"(List $t)"
   export Ty.*
 
   final case class TDef(params: List[Ty], retrn: Ty):

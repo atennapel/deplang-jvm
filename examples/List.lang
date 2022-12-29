@@ -1,0 +1,2 @@
+listid : {A : U0 Val} -> List A -> List A = \x. x;
+listid2 : List Int -> List Int := \x. listid x;

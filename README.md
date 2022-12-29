@@ -7,6 +7,7 @@ Try it out:
 ```
 sbt "run examples/Test"
 javac jvmstd/Pair.java
+javac jvmstd/List.java
 java Test
 ```
 
@@ -43,6 +44,9 @@ TODO:
 - [x] Remove Nat
 - [x] Tail recursion
 - [ ] Primitive polymorphic list datatype
+  - [x] Type
+  - [ ] Constructors
+  - [ ] Elimination
 - [ ] More simplification: case-of-case, app and case commutation
 - [ ] Better inlining (inline linear lambdas, constants, globals)
 - [ ] Combine jumps (for example if+comparisons)

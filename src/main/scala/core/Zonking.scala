@@ -88,6 +88,8 @@ object Zonking:
     case IntLit(v)       => tm
     case Binop(op, a, b) => Binop(op, zonk(a), zonk(b))
 
+    case ListTy(t) => ListTy(zonk(t))
+
   private def enterEnv(n: Int, e: Env)(implicit l: Lvl): Env =
     @tailrec
     def go(k: Int, e: Env): Env =

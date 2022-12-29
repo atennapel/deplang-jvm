@@ -7,13 +7,13 @@ object Syntax:
     case TBool
     case TInt
     case TPair
-    case TObject
+    case TList
 
     override def toString: String = this match
-      case TBool   => "Bool"
-      case TInt    => "Int"
-      case TPair   => s"Pair"
-      case TObject => "Object"
+      case TBool => "Bool"
+      case TInt  => "Int"
+      case TPair => "Pair"
+      case TList => "List"
   export Ty.*
 
   final case class TDef(params: List[Ty], retrn: Ty):

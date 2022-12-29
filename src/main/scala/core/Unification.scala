@@ -99,6 +99,8 @@ object Unification:
       case VInt       => IntTy
       case VIntLit(v) => IntLit(v)
 
+      case VList(t) => ListTy(go(t))
+
     go(v)
 
   private def lams(sp: Spine, b: Tm): Tm =
@@ -159,6 +161,7 @@ object Unification:
       case (VIntLit(a), VIntLit(b)) if a == b => ()
       case (VLift(_, a), VLift(_, b))         => unify(a, b)
       case (VQuote(a), VQuote(b))             => unify(a, b)
+      case (VList(a), VList(b))               => unify(a, b)
       case (VPi(_, _, t1, u11, b1, u12), VPi(_, _, t2, u21, b2, u22)) =>
         unify(t1, t2); unify(u11, u21); unify(b1, b2); unify(u12, u22)
       case (VSigma(_, t1, u11, b1, u12), VSigma(_, t2, u21, b2, u22)) =>

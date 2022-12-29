@@ -100,13 +100,14 @@ object Generator:
     bos.close()
 
   private val PAIR_TYPE: Type = Type.getType("Ljvmstd/Pair;")
+  private val LIST_TYPE: Type = Type.getType("Ljvmstd/List;")
   private val OBJECT_TYPE: Type = Type.getType("Ljava/lang/Object;")
 
   private def gen(t: Ty)(implicit ctx: Ctx): Type = t match
-    case TBool   => Type.BOOLEAN_TYPE
-    case TInt    => Type.INT_TYPE
-    case TPair   => PAIR_TYPE
-    case TObject => OBJECT_TYPE
+    case TBool => Type.BOOLEAN_TYPE
+    case TInt  => Type.INT_TYPE
+    case TPair => PAIR_TYPE
+    case TList => LIST_TYPE
 
   private def constantValue(e: Tm): Option[Any] = e match
     case True      => Some(true)

@@ -39,7 +39,7 @@ object Staging:
     case VFun1(left: Val1, vf: Val1, right: Val1 => Val1)
     case VPairTy1(fst: Val1, snd: Val1 => Val1)
     case VPair1(fst: Val1, snd: Val1)
-    case VPoly1
+    case VList1(ty: Val1)
   import Val1.*
 
   private enum Val0:
@@ -108,6 +108,8 @@ object Staging:
     case Lift(rep, t) => VType1
     case Quote(t)     => VQuote(eval0(t))
     case Splice(t)    => impossible()
+
+    case ListTy(t) => VList1(eval1(t))
 
     case Wk(t) => eval1(t)(env.tail)
 
@@ -224,8 +226,8 @@ object Staging:
       case VInt1  => IR.TInt
       case VPairTy1(fst, snd) =>
         IR.TPair(quote1ty(fst), quote1ty(snd(null))(k + 1))
-      case VPoly1 => IR.TPoly
-      case _      => impossible()
+      case VList1(t) => IR.TList(quote1ty(t))
+      case _         => impossible()
 
   private def quote1tdef(v: Val1, ps: List[IR.Ty] = Nil)(implicit
       k: Lvl
@@ -245,8 +247,8 @@ object Staging:
       case VInt1  => IR.TDef(IR.TInt)
       case VPairTy1(fst, snd) =>
         IR.TDef(IR.TPair(quote1ty(fst), quote1ty(snd(null))(k + 1)))
-      case VPoly1 => IR.TDef(IR.TPoly)
-      case _      => quote1tdef(v)
+      case VList1(t) => IR.TDef(IR.TList(quote1ty(t)))
+      case _         => quote1tdef(v)
 
   private def stageIR(tm: Tm): Tmp =
     debug(s"stageIR $tm")
