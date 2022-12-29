@@ -33,7 +33,6 @@ TODO:
 - [x] Bytecode generation
   - [x] Primitives
   - [x] Boxing/unboxing
-  - [x] foldNat
   - [x] main method
   - [x] Definitions without parameters to static properties
 - [x] Named sigma projection
@@ -43,10 +42,7 @@ TODO:
 - [x] Add Int and primitive binops
 - [x] Remove Nat
 - [x] Tail recursion
-- [ ] Datatypes
-  - [x] Constructors
-  - [ ] Elimination
+- [ ] Primitive polymorphic list datatype
 - [ ] More simplification: case-of-case, app and case commutation
 - [ ] Better inlining (inline linear lambdas, constants, globals)
 - [ ] Combine jumps (for example if+comparisons)
-- [ ] Way to monomorphize datatypes on demand (staged datatypes?)

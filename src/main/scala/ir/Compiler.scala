@@ -30,8 +30,6 @@ object Compiler:
     )
 
   private def go(d: Def): List[IR.Def] = d match
-    case DData(x, ps, cs) =>
-      List(IR.DData(norm(x), cs.map((c, as) => (norm(c), as.map(go)))))
     case DDef(x, t, v) =>
       val (ps, rt, b) = etaExpand(t, v)
       implicit val name: Name = norm(x)
@@ -108,24 +106,10 @@ object Compiler:
       case If(TDef(Nil, t), c, a, b) =>
         IR.If(go(t), go(c, false), go(a, tr), go(b, tr))
 
-      case Con(x, t, as) =>
-        IR.Con(
-          norm(x),
-          go(t),
-          as.map((a, b, p) =>
-            if p then (box(b, go(a, false)), go(b), p)
-            else (go(a, false), go(b), p)
-          )
-        )
-
-      case Case(scrut, TDef(Nil, t), cs) =>
-        ??? // IR.Case(go(scrut, false), go(t), cs.map((x, b) => (x, go(b, tr))))
-
       case _ => impossible()
 
   private def box(ty: Ty, tm: IR.Tm): IR.Tm = ty match
     case TPair(_, _) => tm
-    case TCon(_, _)  => tm
     case TPoly       => tm
     case _ =>
       val ct = go(ty)
@@ -136,7 +120,6 @@ object Compiler:
 
   private def unbox(ty: Ty, tm: IR.Tm): IR.Tm = ty match
     case TPair(_, _) => tm
-    case TCon(_, _)  => tm
     case TPoly       => tm
     case _ =>
       val ct = go(ty)
@@ -149,7 +132,6 @@ object Compiler:
     case TBool       => IR.TBool
     case TInt        => IR.TInt
     case TPair(_, _) => IR.TPair
-    case TCon(x, _)  => IR.TCon(norm(x))
     case TPoly       => IR.TObject
 
   private def go(t: TDef): IR.TDef = t match

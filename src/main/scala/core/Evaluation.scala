@@ -102,31 +102,14 @@ object Evaluation:
     case v =>
       body(VLam(DoBind(Name("x")), Expl, CFun(a => vfix(go, x, body, a))), v)
 
-  def vcase(
-      scrut: Val,
-      ty: VTy,
-      vf: VTy,
-      cs: List[(Name, List[(Bind, VTy, Boolean)], ClosN)]
-  ): Val =
-    scrut match
-      case VCon(x, _, as) =>
-        val (_, _, b) = cs.find((y, _, _) => y == x).get
-        b(as.map(_._1))
-      case VRigid(hd, sp) => VRigid(hd, SCase(sp, ty, vf, cs))
-      case VFlex(hd, sp)  => VFlex(hd, SCase(sp, ty, vf, cs))
-      case VGlobal(x, sp, v) =>
-        VGlobal(x, SCase(sp, ty, vf, cs), () => vcase(v(), ty, vf, cs))
-      case _ => impossible()
-
   def vspine(v: Val, sp: Spine): Val = sp match
-    case SId                  => v
-    case SApp(sp, a, i)       => vapp(vspine(v, sp), a, i)
-    case SSplice(sp)          => vsplice(vspine(v, sp))
-    case SProj(sp, p)         => vproj(vspine(v, sp), p)
-    case SIf(sp, t, a, b)     => vif(vspine(v, sp), t, a, b)
-    case SBinop(a, op, b)     => vbinop(op, vspine(v, sp), b)
-    case SFix(go, x, b, sp)   => vfix(go, x, b, vspine(v, sp))
-    case SCase(sp, t, vf, cs) => vcase(vspine(v, sp), t, vf, cs)
+    case SId                => v
+    case SApp(sp, a, i)     => vapp(vspine(v, sp), a, i)
+    case SSplice(sp)        => vsplice(vspine(v, sp))
+    case SProj(sp, p)       => vproj(vspine(v, sp), p)
+    case SIf(sp, t, a, b)   => vif(vspine(v, sp), t, a, b)
+    case SBinop(a, op, b)   => vbinop(op, vspine(v, sp), b)
+    case SFix(go, x, b, sp) => vfix(go, x, b, vspine(v, sp))
 
   def vmeta(id: MetaId): Val = getMeta(id) match
     case Unsolved     => VMeta(id)
@@ -180,19 +163,6 @@ object Evaluation:
     case IntLit(v)       => VIntLit(v)
     case Binop(op, a, b) => vbinop(op, eval(a), eval(b))
 
-    case TCon(x, as) => VTCon(x, as.map(eval))
-    case Con(x, t, as) =>
-      VCon(x, eval(t), as.map((a, b, p) => (eval(a), eval(b), p)))
-    case Case(scrut, t, vf, cs) =>
-      vcase(
-        eval(scrut),
-        eval(t),
-        eval(vf),
-        cs.map((y, ys, b) =>
-          (y, ys.map((a, b, c) => (a, eval(b), c)), ClosN(env, b))
-        )
-      )
-
     case Meta(id)              => vmeta(id)
     case InsertedMeta(id, bds) => vappbds(vmeta(id), bds)
 
@@ -230,21 +200,6 @@ object Evaluation:
           x,
           quote(b(VVar(k), VVar(k + 1)), unfold)(k + 2),
           quote(hd, v, unfold)
-        )
-      case SCase(scrut, t, vf, cs) =>
-        Case(
-          quote(hd, scrut, unfold),
-          quote(t, unfold),
-          quote(vf, unfold),
-          cs.map((x, xs, b) => {
-            (
-              x,
-              xs.map((x, t, b) => (x, quote(t, unfold), b)),
-              quote(b((0 until xs.size).map(i => VVar(k + i)).toList), unfold)(
-                k + xs.size
-              )
-            )
-          })
         )
 
   private def quote(b: Clos, unfold: Unfold)(implicit k: Lvl): Tm =
@@ -296,13 +251,5 @@ object Evaluation:
 
       case VInt       => IntTy
       case VIntLit(v) => IntLit(v)
-
-      case VTCon(x, as) => TCon(x, as.map(quote(_, unfold)))
-      case VCon(x, t, as) =>
-        Con(
-          x,
-          quote(t, unfold),
-          as.map((a, b, p) => (quote(a, unfold), quote(b, unfold), p))
-        )
 
   def nf(tm: Tm)(implicit env: Env = Nil): Tm = quote(eval(tm))(mkLvl(env.size))

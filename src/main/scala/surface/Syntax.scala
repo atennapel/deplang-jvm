@@ -33,7 +33,6 @@ object Syntax:
     case Splice(tm: Tm)
 
     case If(cond: Tm, ifTrue: Tm, ifFalse: Tm)
-    case Case(scrut: Tm, cases: List[(Name, List[Bind], Tm)])
 
     case IntLit(value: Int)
 
@@ -77,10 +76,6 @@ object Syntax:
       case Pair(fst, snd)         => s"($fst, $snd)"
 
       case If(c, a, b) => s"(if $c then $a else $b)"
-      case Case(x, cs) =>
-        s"(case $x | ${cs.map((c, xs, b) => s"$c ${xs.mkString(" ")} => $b").mkString(" | ")})"
-
-      case IntLit(n) => s"$n"
 
       case IntLit(n) => s"$n"
 
@@ -111,8 +106,6 @@ object Syntax:
       case Pair(fst, snd) => Pair(fst.removePos, snd.removePos)
 
       case If(c, a, b) => If(c.removePos, a.removePos, b.removePos)
-      case Case(c, cs) =>
-        Case(c.removePos, cs.map((x, xs, t) => (x, xs, t.removePos)))
 
       case Pos(_, t) => t.removePos
 
@@ -126,7 +119,6 @@ object Syntax:
 
   enum Def:
     case DDef(name: Name, univ: Ty, ty: Option[Ty], value: Tm)
-    case DData(name: Name, params: List[Name], cases: List[(Name, List[Ty])])
 
     override def toString: String = this match
       case DDef(x, u, Some(t), v) =>
@@ -143,10 +135,4 @@ object Syntax:
           case Var(Name("U1"))                              => s""
           case _                                            => s"?"
         s"$x $s= $v;"
-      case DData(x, ps, cs) =>
-        s"data $x${if ps.isEmpty then "" else s" ${ps.mkString(" ")}"} := ${cs
-            .map((x, ts) =>
-              s"$x${if ts.isEmpty then "" else s" ${ts.mkString(" ")}"}"
-            )
-            .mkString(" | ")};"
   export Def.*

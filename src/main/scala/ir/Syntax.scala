@@ -7,15 +7,12 @@ object Syntax:
     case TBool
     case TInt
     case TPair(fst: Ty, snd: Ty)
-    case TCon(name: Name, args: List[Ty])
     case TPoly
 
     override def toString: String = this match
       case TBool           => "Bool"
       case TInt            => "Int"
       case TPair(fst, snd) => s"($fst ** $snd)"
-      case TCon(x, Nil)    => s"$x"
-      case TCon(x, as)     => s"($x ${as.mkString(" ")})"
       case TPoly           => "Poly"
   export Ty.*
 
@@ -47,13 +44,6 @@ object Syntax:
     case IntLit(value: Int)
     case Binop(op: Op, left: Tm, right: Tm)
 
-    case Con(name: Name, ty: Ty, args: List[(Tm, Ty, Boolean)])
-    case Case(
-        scrut: Tm,
-        ty: TDef,
-        cases: List[(Name, List[(Int, Ty, Boolean)], Tm)]
-    )
-
     override def toString: String = this match
       case Local(x, _)  => s"'$x"
       case Global(x, _) => s"$x"
@@ -74,12 +64,6 @@ object Syntax:
 
       case IntLit(n)       => s"$n"
       case Binop(op, a, b) => s"($a $op $b)"
-
-      case Con(x, _, Nil) => s"$x"
-      case Con(x, _, as)  => s"($x ${as.map(_._1).mkString(" ")})"
-
-      case Case(x, _, cs) =>
-        s"(case $x | ${cs.map((c, xs, b) => s"$c ${xs.map((x, _, _) => s"'$x")} => $b").mkString(" | ")})"
 
     def flattenLams: (List[(Int, Ty)], Option[Ty], Tm) =
       def go(t: Tm): (List[(Int, Ty)], Option[Ty], Tm) = t match
@@ -119,17 +103,6 @@ object Syntax:
       case If(_, c, a, b) => c.freeVars ++ a.freeVars ++ b.freeVars
 
       case Binop(_, a, b) => a.freeVars ++ b.freeVars
-
-      case Con(_, _, as) =>
-        as.foldLeft[List[(Int, TDef)]](Nil) { case (fv, (t, _, _)) =>
-          fv ++ t.freeVars
-        }
-
-      case Case(a, _, cs) =>
-        a.freeVars ++ cs.foldLeft[List[(Int, TDef)]](Nil) {
-          case (fv, (_, xs, t)) =>
-            fv ++ t.freeVars.filterNot((y, _) => xs.exists((x, _, _) => x == y))
-        }
 
       case _ => Nil
 
@@ -220,30 +193,6 @@ object Syntax:
       case Binop(op, a, b) =>
         Binop(op, a.subst(sub, scope), b.subst(sub, scope))
 
-      case Con(x, t, as) =>
-        Con(x, t, as.map((a, b, p) => (a.subst(sub, scope), b, p)))
-
-      case Case(scrut, ty, cs) =>
-        Case(
-          scrut.subst(sub, scope),
-          ty,
-          cs.map((x, xs, c) => {
-            def go(
-                xs: List[(Int, Ty)],
-                sub: Map[Int, Tm],
-                scope: Set[Int]
-            ): (Map[Int, Tm], Set[Int]) = xs match
-              case Nil => (sub, scope)
-              case (x, _) :: xs if !scope.contains(x) =>
-                go(xs, sub - x, scope + x)
-              case (x, t) :: xs =>
-                val y = scope.max + 1
-                go(xs, sub + (x -> Local(y, TDef(t))), scope + y)
-            val (sub2, scope2) = go(xs.map((x, t, _) => (x, t)), sub, scope)
-            (x, xs, c.subst(sub2, scope2))
-          })
-        )
-
       case _ => this
   export Tm.*
 
@@ -254,14 +203,7 @@ object Syntax:
 
   enum Def:
     case DDef(name: Name, ty: TDef, value: Tm)
-    case DData(name: Name, params: List[Name], cases: List[(Name, List[Ty])])
 
     override def toString: String = this match
       case DDef(x, t, v) => s"$x : $t = $v;"
-      case DData(x, ps, cs) =>
-        s"data $x${if ps.isEmpty then "" else s" ${ps.mkString(" ")}"} := ${cs
-            .map((x, ts) =>
-              s"$x${if ts.isEmpty then "" else s" ${ts.mkString(" ")}"}"
-            )
-            .mkString(" | ")};"
   export Def.*

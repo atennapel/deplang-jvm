@@ -5,9 +5,16 @@ S1 : Nat1 -> Nat1 = \n A z s. s (n A z s);
 add1 : Nat1 -> Nat1 -> Nat1 = \b a A z s. a A (b A z s) s;
 mul1 : Nat1 -> Nat1 -> Nat1 = \b a A z s. a A z (\x. b A x s);
 
-up : Nat -> Nat1 = \n A z s. foldNat n z (\_ r. s r);
-down : Nat1 -> Nat = \n. n Nat Z S;
+fold : {A : U0 Val} -> Int -> A -> (Int -> A -> A) -> A =
+  \{A} n z s.
+    `(let foldR : A -> A := fix (go c. \acc.
+      if c <= 0 then acc
+      else go (c - 1) (s c acc)) n in
+    foldR z);
 
-test : Nat -> Nat := \n. down (add1 (S1 Z1) (mul1 (S1 (S1 Z1)) (up n)));
+up : Int -> Nat1 = \n A z s. fold n z (\_ r. s r);
+down : Nat1 -> Int = \n. n Int 0 (\n. n + 1);
 
-main : Nat -> Nat := \_. test 10;
+test : Int -> Int := \n. down (add1 (S1 Z1) (mul1 (S1 (S1 Z1)) (up n)));
+
+main : Int -> Int := \_. test 10;

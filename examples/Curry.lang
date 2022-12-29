@@ -1,6 +1,6 @@
-add : (Nat ** Nat) -> Nat := \p. foldNat p.1 p.2 (\_ r. S r);
-(+) : Nat -> Nat -> Nat = \a b. add (a, b);
+add : (Int ** Int) -> Int := \p. p.1 + p.2;
+(++) : Int -> Int -> Int = \a b. add (a, b);
 
-inc : Nat -> Nat := (+) 1;
+inc : Int -> Int := (++) 1;
 
-main : Nat -> Nat := \_. inc 10;
+main : Int -> Int := \_. inc 10;

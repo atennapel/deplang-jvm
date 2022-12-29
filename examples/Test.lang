@@ -3,7 +3,7 @@ Nat1 = (A : U1) -> A -> (A -> A) -> A;
 Z1 : Nat1 = \A z s. z;
 S1 : Nat1 -> Nat1 = \n A z s. s (n A z s);
 
-(+) : Nat1 -> Nat1 -> Nat1 = \a b. a Nat1 b S1;
+(++) : Nat1 -> Nat1 -> Nat1 = \a b. a Nat1 b S1;
 
 (~) : {A : U1} -> A -> A -> U1 =
   \{A} x y. (P : A -> U1) -> P x -> P y;
@@ -16,4 +16,4 @@ n1 = S1 n0;
 n2 = S1 n1;
 n3 = S1 n2;
 
-proof : (n1 + n2) ~ n3 = Refl;
+proof : (n1 ++ n2) ~ n3 = Refl;

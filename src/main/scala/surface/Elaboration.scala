@@ -258,39 +258,6 @@ object Elaboration:
         )
         Fix(go, x, eb, ea)
 
-      case (S.Case(scrut, cs), _) =>
-        force(univ) match
-          case VU1 => check(S.Quote(tm), ty, univ)
-          case VU(vf) =>
-            val (escrut, scrutty) = infer(scrut, VUVal())
-            val (x, as) = force(scrutty) match
-              case VTCon(x, as) => (x, as)
-              case _ =>
-                throw ElaborateError(
-                  s"expected type constructor in case $tm, but got: ${ctx.pretty(scrutty)}"
-                )
-            val ecs = cs.map((x, xs, b) =>
-              getCons(x) match
-                case None =>
-                  throw ElaborateError(s"undefined constructor name $x")
-                case Some(ConsEntry(_, args)) =>
-                  def go(ctx: Ctx, as: List[(Bind, VTy)]): Ctx = as match
-                    case Nil           => ctx
-                    case (x, vt) :: as => go(ctx.bind(x, vt, VUVal()), as)
-                  (
-                    x,
-                    xs.zip(args).map { case (x, (t, _, p)) => (x, t, p) },
-                    check(b, ty, VU(vf))(
-                      go(
-                        ctx,
-                        xs.zip(args).map { case (x, (_, vt, _)) => (x, vt) }
-                      )
-                    )
-                  )
-            )
-            Case(escrut, ctx.quote(ty), ctx.quote(vf), ecs)
-          case _ => throw ElaborateError(s"invalid universe in check")
-
       case (tm, _) =>
         val (etm, ty2, univ2) = insert(infer(tm))
         debug(
@@ -532,68 +499,5 @@ object Elaboration:
         debug(s"$x : $et = $ev")
         setGlobal(GlobalEntry(x, ev, et, eval(ev)(Nil), eval(et)(Nil), veu))
         DDef(x, eu, et, ev)
-      case S.DData(x, ps, cs) =>
-        val tconty =
-          ps.foldLeft(VUVal())((rt, _) => vpi("_", VUVal(), VU1, VU1, _ => rt))
-        val rt =
-          TCon(x, (0 until ps.size).reverse.map(i => Local(mkIx(i))).toList)
-        val lam = ps.foldRight(rt)((p, b) => Lam(DoBind(p), Expl, b))
-        val tcon =
-          setGlobal(
-            GlobalEntry(
-              x,
-              lam,
-              quote(tconty)(lvl0),
-              eval(lam)(Nil),
-              tconty,
-              VU1
-            )
-          )
-        implicit val ctx: Ctx =
-          ps.foldLeft(Ctx.empty((0, 0)))((ctx, p) =>
-            ctx.bind(DoBind(p), VUVal(), VU1)
-          )
-        val ecs = cs.map((c, ts) => {
-          if getCons(c).isDefined then
-            throw ElaborateError(s"duplicate constructor defined $c")
-          val ets = ts.map(t => {
-            val et = check(t, VUVal(), VU1)
-            zonk(et)(lvl0, Nil)
-          })
-          val ty1 = ets.foldRight(Lift(VFVal, rt))((p, rt) =>
-            Pi(DontBind, Expl, Lift(VFVal, p), U1, Wk(rt), U1)
-          )
-          val ty2 = ps.foldRight(ty1)((p, rt) =>
-            Pi(DoBind(p), Impl, quote(VUVal())(lvl0), U1, rt, U1)
-          )
-          val args = (0 until ets.size).reverse
-            .map(i => {
-              val tm = Splice(Local(mkIx(i)))
-              val ety = ets(ets.size - i - 1)
-              val ty = wk(ets.size, ety)
-              val poly = ety match
-                case Local(_) => true
-                case _        => false
-              (tm, ty, poly)
-            })
-            .toList
-          setCons(ConsEntry(c, args.map((_, t, p) => (t, eval(t)(Nil), p))))
-          val inner = Quote(
-            Con(
-              c,
-              wk(ets.size, rt),
-              args
-            )
-          )
-          val lam1 = (0 until ets.size).foldRight(inner)((i, b) =>
-            Lam(DoBind(Name(s"a$i")), Expl, b)
-          )
-          val lam2 = ps.foldRight(lam1)((p, b) => Lam(DoBind(p), Impl, b))
-          setGlobal(
-            GlobalEntry(c, lam2, ty2, eval(lam2)(Nil), eval(ty2)(Nil), VU1)
-          )
-          (c, ets)
-        })
-        DData(x, ps, ecs)
 
   def elaborate(ds: S.Defs): Defs = Defs(ds.toList.map(elaborate))

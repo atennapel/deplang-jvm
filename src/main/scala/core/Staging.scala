@@ -39,7 +39,6 @@ object Staging:
     case VFun1(left: Val1, vf: Val1, right: Val1 => Val1)
     case VPairTy1(fst: Val1, snd: Val1 => Val1)
     case VPair1(fst: Val1, snd: Val1)
-    case VTCon1(name: Name, args: List[Val1])
     case VPoly1
   import Val1.*
 
@@ -58,13 +57,6 @@ object Staging:
     case VIf0(ty: Val1, cond: Val0, ifTrue: Val0, ifFalse: Val0)
     case VIntLit0(value: Int)
     case VBinop0(op: Op, left: Val0, right: Val0)
-    case VCon0(name: Name, ty: Val1, args: List[(Val0, Val1, Boolean)])
-    case VCase0(
-        scrut: Val0,
-        ty: Val1,
-        vf: Val1,
-        cs: List[(Name, List[(Name, Val1, Boolean)], Val0)]
-    )
   import Val0.*
 
   private def vvar1(ix: Ix)(implicit env: Env): Val1 =
@@ -119,8 +111,6 @@ object Staging:
 
     case Wk(t) => eval1(t)(env.tail)
 
-    case TCon(x, as) => VTCon1(x, as.map(eval1))
-
     case _ => impossible()
 
   private def vvar0(ix: Ix)(implicit env: Env): Val0 =
@@ -170,17 +160,6 @@ object Staging:
     case IntLit(n)       => VIntLit0(n)
     case Binop(op, a, b) => VBinop0(op, eval0(a), eval0(b))
 
-    case Con(x, t, as) =>
-      VCon0(x, eval1(t), as.map((a, b, p) => (eval0(a), eval1(b), p)))
-
-    case Case(scrut, ty, vf, cs) =>
-      VCase0(
-        eval0(scrut),
-        eval1(ty),
-        eval1(vf),
-        cs.map((x, xs, b) => (x, xs, eval0(b)))
-      )
-
     case _ => impossible()
 
   // staging
@@ -203,9 +182,6 @@ object Staging:
 
     case IntLit(value: Int)
     case Binop(op: Op, left: Tmp, right: Tmp)
-
-    case Con(name: Name, ty: IR.Ty, args: List[(Tmp, IR.Ty, Boolean)])
-    case Case(scrut: Tmp, ty: IR.TDef, cases: List[(Name, Tmp)])
 
   private def quote0ir(v: Val0)(implicit k: Lvl): Tmp =
     // debug(s"quote0ir $v")
@@ -239,19 +215,7 @@ object Staging:
         Tmp.If(quote1tdefOrTy(t), quote0ir(c), quote0ir(a), quote0ir(b))
       case VIntLit0(n)       => Tmp.IntLit(n)
       case VBinop0(op, a, b) => Tmp.Binop(op, quote0ir(a), quote0ir(b))
-      case VCon0(x, t, as) =>
-        Tmp.Con(
-          x,
-          quote1ty(t),
-          as.map((a, b, p) => (quote0ir(a), quote1ty(b), p))
-        )
-      case VCase0(scrut, ty, _, cs) =>
-        Tmp.Case(
-          quote0ir(scrut),
-          quote1tdefOrTy(ty),
-          cs.map((x, b) => (x, quote0ir(b)))
-        )
-      case _ => impossible()
+      case _                 => impossible()
 
   private def quote1ty(v: Val1)(implicit k: Lvl): IR.Ty =
     // debug(s"quote1ty $v")
@@ -260,9 +224,8 @@ object Staging:
       case VInt1  => IR.TInt
       case VPairTy1(fst, snd) =>
         IR.TPair(quote1ty(fst), quote1ty(snd(null))(k + 1))
-      case VTCon1(x, as) => IR.TCon(x, as.map(quote1ty))
-      case VPoly1        => IR.TPoly
-      case _             => impossible()
+      case VPoly1 => IR.TPoly
+      case _      => impossible()
 
   private def quote1tdef(v: Val1, ps: List[IR.Ty] = Nil)(implicit
       k: Lvl
@@ -282,9 +245,8 @@ object Staging:
       case VInt1  => IR.TDef(IR.TInt)
       case VPairTy1(fst, snd) =>
         IR.TDef(IR.TPair(quote1ty(fst), quote1ty(snd(null))(k + 1)))
-      case VTCon1(x, as) => IR.TDef(IR.TCon(x, as.map(quote1ty)))
-      case VPoly1        => IR.TDef(IR.TPoly)
-      case _             => quote1tdef(v)
+      case VPoly1 => IR.TDef(IR.TPoly)
+      case _      => quote1tdef(v)
 
   private def stageIR(tm: Tm): Tmp =
     debug(s"stageIR $tm")
@@ -413,18 +375,6 @@ object Staging:
         case _    => IR.TBool
       (IR.Binop(op, ea, eb), IR.TDef(rt))
 
-    case Tmp.Con(x, t, as) =>
-      val eas = as.map((t, ty, p) => {
-        val ea = check(t, ty)
-        (ea, ty, p)
-      })
-      (IR.Con(x, t, eas), IR.TDef(t))
-
-    case Tmp.Case(scrut, ty, cs) =>
-      val (escrut, scrutty) = infer(scrut)
-      val ecs = cs.map((c, b) => (c, check(b, ty)))
-      (IR.Case(escrut, ty, ecs), ty)
-
     case _ => impossible()
 
   private def stage(d: Def)(implicit globals: GlobalsTy): Option[IR.Def] =
@@ -442,9 +392,6 @@ object Staging:
             globals += (x -> ty)
             Some(IR.DDef(x, ty, tm))
           case _ => None
-      case DData(x, ps, cs) =>
-        val env = ps.foldLeft(Empty)((env, _) => Def1(env, VPoly1))
-        Some(IR.DData(x, ps, cs.map((c, as) => (c, as.map(stageIRTy(env, _))))))
 
   def stage(ds: Defs): IR.Defs =
     implicit val globals: GlobalsTy = mutable.Map.empty

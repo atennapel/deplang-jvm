@@ -4,14 +4,7 @@ S1 : Nat1 -> Nat1 = \n A z s. s (n A z s);
 foldNat1 : {A : U0 Val} -> Nat1 -> A -> (A -> A) -> A =
   \{A} n z s. n A z s;
 
-fold : {A : U0 Val} -> Nat -> A -> (Nat -> A -> A) -> A =
-  \n z s. foldNat n z (\m r. s m r);
-
-pred : Nat -> Nat := \n. fold n Z (\m _. m);
-(+) : Nat -> Nat -> Nat := \a b. fold a b (\_ r. S r);
-(*) : Nat -> Nat -> Nat := \a b. fold a Z (\_ r. b + r);
-
-pow : Nat1 -> Nat -> Nat =
+pow : Nat1 -> Int -> Int =
   \n m. foldNat1 n 1 (\n. m * n);
 
-main : Nat -> Nat := \_. pow (S1 (S1 Z1)) 3;
+main : Int -> Int := \_. pow (S1 (S1 Z1)) 3;

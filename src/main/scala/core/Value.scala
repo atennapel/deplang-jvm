@@ -28,12 +28,6 @@ object Value:
     case SIf(spine: Spine, ty: VTy, ifTrue: Val, ifFalse: Val)
     case SBinop(left: Spine, op: Op, right: Val)
     case SFix(go: Name, name: Name, body: Clos2, arg: Spine)
-    case SCase(
-        scrut: Spine,
-        ty: VTy,
-        vf: VTy,
-        cases: List[(Name, List[(Bind, VTy, Boolean)], ClosN)]
-    )
   export Spine.*
 
   enum Head:
@@ -67,9 +61,6 @@ object Value:
 
     case VInt
     case VIntLit(value: Int)
-
-    case VTCon(name: Name, args: List[Val])
-    case VCon(name: Name, ty: VTy, args: List[(Val, VTy, Boolean)])
   export Val.*
 
   private def name(x: String): Bind =

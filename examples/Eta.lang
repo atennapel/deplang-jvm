@@ -1,10 +1,10 @@
-add : Nat -> Nat -> Nat := \a b. a;
+add : Int -> Int -> Int := \a b. a;
 
-papp : Nat -> Nat := add 0;
+papp : Int -> Int := add 0;
 
-lettest : Nat -> (Nat ** Nat) := \x. let x ::= x in (x, x);
+lettest : Int -> (Int ** Int) := \x. let x ::= x in (x, x);
 
-letlambda : Nat -> Nat ** Nat := \x.
-  let id : Nat -> Nat ** Nat
+letlambda : Int -> Int ** Int := \x.
+  let id : Int -> Int ** Int
     := \y. (y, x) in
   id x;

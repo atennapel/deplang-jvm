@@ -62,8 +62,6 @@ object Pretty:
     case Proj(_, _)          => pretty(tm)
     case Meta(_)             => pretty(tm)
     case InsertedMeta(_, _)  => pretty(tm)
-    case TCon(x, Nil)        => pretty(tm)
-    case Con(x, _, Nil)      => pretty(tm)
     case Wk(t)               => prettyParen(t, app)(ns.tail)
     case _                   => s"(${pretty(tm)})"
 
@@ -119,20 +117,6 @@ object Pretty:
     case IntLit(v)       => s"$v"
     case Binop(op, a, b) => s"$a $op $b"
 
-    case TCon(x, Nil) => s"$x"
-    case TCon(x, as)  => s"$x ${as.map(prettyParen(_)).mkString(" ")}"
-
-    case Con(x, _, Nil) => s"$x"
-    case Con(x, _, as) =>
-      s"$x ${as.map((t, _, _) => prettyParen(t)).mkString(" ")}"
-    case Case(x, _, _, cs) =>
-      s"case ${prettyParen(x)} | ${cs
-          .map((c, xs, b) => {
-            val (ys, ns2) = enter(xs.map(_._1))
-            s"$c ${ys.mkString(" ")} => ${pretty(b)(ns2)}"
-          })
-          .mkString(" | ")}"
-
     case Meta(id)            => s"?$id"
     case InsertedMeta(id, _) => s"?$id"
 
@@ -156,15 +140,6 @@ object Pretty:
         case U1                   => ""
         case _                    => "?"
       s"$x : ${pretty(t)} $s= ${pretty(v)(x :: ns)};"
-    case DData(x, ps, cs) =>
-      s"data $x${if ps.isEmpty then "" else s" ${ps.mkString(" ")}"} := ${cs
-          .map((x, ts) =>
-            s"$x${
-                if ts.isEmpty then ""
-                else s" ${ts.map(prettyParen(_)(ps.reverse ++ (x :: ns))).mkString(" ")}"
-              }"
-          )
-          .mkString(" | ")};"
 
   def pretty(ds: Defs)(implicit ns: List[Name]): String =
     ds.toList.map(pretty).mkString("\n")

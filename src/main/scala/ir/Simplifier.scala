@@ -96,26 +96,6 @@ object Simplifier:
             case None         => Some(If(t, c, a, b))
         case None => go2(a, b).map(If(t, c, _, _))
 
-    case Con(x, t, as0) =>
-      orL(go, as0.map(_._1)).map(as =>
-        Con(
-          x,
-          t,
-          (0 until as.size).map(i => (as(i), as0(i)._2, as0(i)._3)).toList
-        )
-      )
-
-    case Case(Con(c, ct, as), ty, cs) =>
-      ??? // Some(cs.find((y, _, b) => y == c).get._2)
-    case Case(t, TDef(ps, rt), cs) if ps.nonEmpty => ???
-    case Case(t, ty, cs)                          => ???
-    /*go(t) match
-        case Some(t) => Some(Case(t, ty, cs))
-        case None =>
-          orL(go, cs.map(_._2)).map(csb =>
-            Case(t, ty, (0 until cs.size).map(i => (cs(i)._1, csb(i))).toList)
-          )*/
-
   private def binop(op: Op, a: Tm, b: Tm): Option[Tm] = (op, a, b) match
     case (OAdd, IntLit(a), IntLit(b)) => Some(IntLit(a + b))
     case (OAdd, IntLit(0), b)         => Some(b)

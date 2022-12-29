@@ -45,21 +45,6 @@ object Unification:
           go(b(VVar(pren.cod), VVar(pren.cod + 1)))(pren.lift.lift),
           goSp(hd, sp)
         )
-      case SCase(scrut, t, vf, cs) =>
-        Case(
-          goSp(hd, scrut),
-          go(t),
-          go(vf),
-          cs.map((x, xs, b) => {
-            (
-              x,
-              xs.map((a, b, c) => (a, go(b), c)),
-              go(b((0 until xs.size).map(i => VVar(pren.cod + i)).toList))(
-                pren.liftN(xs.size)
-              )
-            )
-          })
-        )
 
     def goCl(c: Clos)(implicit pren: PRen): Tm =
       go(c(VVar(pren.cod)))(pren.lift)
@@ -114,10 +99,6 @@ object Unification:
       case VInt       => IntTy
       case VIntLit(v) => IntLit(v)
 
-      case VTCon(x, as) => TCon(x, as.map(go))
-      case VCon(x, t, as) =>
-        Con(x, go(t), as.map((a, b, p) => (go(a), go(b), p)))
-
     go(v)
 
   private def lams(sp: Spine, b: Tm): Tm =
@@ -159,14 +140,6 @@ object Unification:
       unify(sp1, sp2)
       val v = VVar(k); val w = VVar(k + 1)
       unify(b1(v, w), b2(v, w))(k + 2)
-    case (SCase(sp1, t1, vf1, cs1), SCase(sp2, t2, vf2, cs2)) =>
-      unify(sp1, sp2); unify(t1, t2); unify(vf1, vf2)
-      cs1.foreach((x, xs, a) => {
-        val aa = a
-        val bb = cs2.find((y, _, _) => x == y).get._3
-        val vv = (0 until xs.size).map(i => VVar(k + i)).toList
-        unify(aa(vv), bb(vv))(k + xs.size)
-      })
     case _ => throw UnifyError("spine mismatch")
 
   private def unify(a: Clos, b: Clos)(implicit k: Lvl): Unit =
@@ -186,10 +159,6 @@ object Unification:
       case (VIntLit(a), VIntLit(b)) if a == b => ()
       case (VLift(_, a), VLift(_, b))         => unify(a, b)
       case (VQuote(a), VQuote(b))             => unify(a, b)
-      case (VTCon(x1, as1), VTCon(x2, as2)) if x1 == x2 =>
-        as1.zip(as2).foreach(unify(_, _))
-      case (VCon(x1, t1, as1), VCon(x2, t2, as2)) if x1 == x2 =>
-        unify(t1, t2); as1.map(_._1).zip(as2.map(_._1)).foreach(unify(_, _))
       case (VPi(_, _, t1, u11, b1, u12), VPi(_, _, t2, u21, b2, u22)) =>
         unify(t1, t2); unify(u11, u21); unify(b1, b2); unify(u12, u22)
       case (VSigma(_, t1, u11, b1, u12), VSigma(_, t2, u21, b2, u22)) =>

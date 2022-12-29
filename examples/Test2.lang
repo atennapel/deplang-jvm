@@ -1,9 +1,9 @@
 id1 : {A : U0 Val} -> A -> A = \x. x;
 
-n : Nat ::= id1 0;
+n : Int ::= id1 0;
 
-n2 : Nat ::= (let id : Nat -> Nat -> Nat := \y x. x in id 0) 0;
+n2 : Int ::= (let id : Int -> Int -> Int := \y x. x in id 0) 0;
 
-add : Nat -> Nat -> Nat = \a b. foldNat a b (\_. S);
+add : Int -> Int -> Int = \a b. a + b;
 
-n3 : Nat ::= add 1 2;
+n3 : Int ::= add 1 2;

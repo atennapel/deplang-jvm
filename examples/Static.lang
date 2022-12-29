@@ -1,4 +1,4 @@
 x ::= 3;
-y : Nat ** Nat ::= (1, 2);
+y : Int ** Int ::= (1, 2);
 
-main : Nat -> Nat := \_. y.1;
+main : Int -> Int := \_. y.1;

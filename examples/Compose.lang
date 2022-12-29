@@ -1,9 +1,9 @@
 (<<) : {A B C : U0 Val} -> (B -> C) -> (A -> B) -> A -> C
   = \f g x. f (g x);
 
-(+) : Nat -> Nat -> Nat := \a b. foldNat a b (\_ r. S r);
-(*) : Nat -> Nat -> Nat := \a b. foldNat a 0 (\_ r. b + r);
+add : Int -> Int -> Int := \x y. x + y;
+mul : Int -> Int -> Int := \x y. x * y;
 
-m2a1 : Nat -> Nat := ((+) 1) << ((*) 2);
+m2a1 : Int -> Int := (add 1) << (mul 2);
 
-main : Nat -> Nat := \_. m2a1 10;
+main : Int -> Int := \_. m2a1 10;

@@ -53,15 +53,6 @@ object Syntax:
     case IntLit(value: Int)
     case Binop(op: Op, left: Tm, right: Tm)
 
-    case TCon(name: Name, args: List[Tm])
-    case Con(name: Name, ty: Ty, args: List[(Tm, Ty, Boolean)])
-    case Case(
-        scrut: Tm,
-        ty: Ty,
-        vf: Ty,
-        cases: List[(Name, List[(Bind, Ty, Boolean)], Tm)]
-    )
-
     case Meta(id: MetaId)
     case InsertedMeta(id: MetaId, bds: BDs)
 
@@ -112,14 +103,6 @@ object Syntax:
       case IntLit(v)       => s"$v"
       case Binop(op, a, b) => s"($a $op $b)"
 
-      case TCon(x, Nil) => s"$x"
-      case TCon(x, as)  => s"($x ${as.mkString(" ")})"
-      case Case(x, _, _, cs) =>
-        s"(case $x | ${cs.map((c, xs, b) => s"$c ${xs.map(_._1).mkString(" ")} => $b").mkString(" | ")})"
-
-      case Con(x, _, Nil) => s"$x"
-      case Con(x, _, as)  => s"($x ${as.map(_._1).mkString(" ")})"
-
       case Meta(id)            => s"?$id"
       case InsertedMeta(id, _) => s"?$id"
   export Tm.*
@@ -143,17 +126,10 @@ object Syntax:
 
   enum Def:
     case DDef(name: Name, vf: Ty, ty: Ty, value: Tm)
-    case DData(name: Name, params: List[Name], cases: List[(Name, List[Ty])])
 
     override def toString: String = this match
       case DDef(x, App(U0, VFVal, Expl), t, v) => s"$x : $t ::= $v;"
       case DDef(x, App(U0, VFFun, Expl), t, v) => s"$x : $t := $v;"
       case DDef(x, U1, t, v)                   => s"$x : $t = $v;"
       case DDef(x, _, t, v)                    => s"$x : $t ?= $v;"
-      case DData(x, ps, cs) =>
-        s"data $x${if ps.isEmpty then "" else s" ${ps.mkString(" ")}"} := ${cs
-            .map((x, ts) =>
-              s"$x${if ts.isEmpty then "" else s" ${ts.mkString(" ")}"}"
-            )
-            .mkString(" | ")};"
   export Def.*
