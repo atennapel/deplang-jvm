@@ -1,0 +1,21 @@
+Unit : U1 = (A : U1) -> A -> A;
+unit : Unit = \A x. x;
+
+(::) : {A : U0 Val} -> A -> List A -> List A = \hd tl. Cons hd tl;
+
+Step : U0 Val -> U0 Val -> U1 =
+  \A S. (vf : VF) (R : U0 vf) -> R -> (A -> S -> R) -> R;
+
+Pull : U0 Val -> U1 =
+  \A. (S : U0 Val) ** (step : S -> Step A S) ** (value : S) ** Unit;
+
+fromList : {A : U0 Val} -> List A -> Pull A =
+  \{A} as. (List A, \as vf R stop yield. case as stop (hd tl. yield hd tl), as, unit);
+
+map : {A B : U0 Val} -> (A -> B) -> Pull A -> Pull B =
+  \{A} f p. (p.S, \as vf R stop yield. p.step as vf R stop (\a s. yield (f a) s), p.value, unit);
+
+Push : U0 Val -> U1 = \A. (vf: VF) (B : U0 vf) -> (A -> B -> B) -> B -> B;
+
+toPush : {A : U0 Val} -> Pull A -> Push A =
+  \{A} p vf B c n. fix (go s. p.step s vf B n (\a s. c a (go s))) (p.value);
