@@ -67,8 +67,8 @@ object Zonking:
     case Pi(x, i, t, u1, b, u2) =>
       Pi(x, i, zonk(t), zonk(u1), zonkLift(b), zonk(u2))
     case Lam(x, i, b) => Lam(x, i, zonkLift(b))
-    case Fix(go, x, b, arg) =>
-      Fix(go, x, zonk(b)(l + 2, enterEnv(2, e)), zonk(arg))
+    case Fix(t1, t2, go, x, b, arg) =>
+      Fix(zonk(t1), zonk(t2), go, x, zonk(b)(l + 2, enterEnv(2, e)), zonk(arg))
 
     case Sigma(x, t, u1, b, u2) =>
       Sigma(x, zonk(t), zonk(u1), zonkLift(b), zonk(u2))
@@ -91,6 +91,17 @@ object Zonking:
     case ListTy(t)        => ListTy(zonk(t))
     case NilL(t)          => NilL(zonk(t))
     case ConsL(t, hd, tl) => ConsL(zonk(t), zonk(hd), zonk(tl))
+    case CaseL(s, et, t, v, n, x, y, c) =>
+      CaseL(
+        zonk(s),
+        zonk(et),
+        zonk(t),
+        zonk(v),
+        zonk(n),
+        x,
+        y,
+        zonk(c)(l + 2, enterEnv(2, e))
+      )
 
   private def enterEnv(n: Int, e: Env)(implicit l: Lvl): Env =
     @tailrec

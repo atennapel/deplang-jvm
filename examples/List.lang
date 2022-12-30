@@ -3,4 +3,40 @@ listid2 : List Int -> List Int := \x. listid x;
 
 (::) : {A : U0 Val} -> A -> List A -> List A = \hd tl. Cons hd tl;
 
+head : Int -> List Int -> Int := \d l.
+  case l d (hd _. hd);
+
 test : List Int ::= 1 :: 2 :: 3 :: Nil;
+
+sum : List Int -> Int := \l.
+  let sumR : Int -> Int := fix (go l. \acc.
+    case l acc (hd tl. go tl (acc + hd))) l in
+  sumR 0;
+
+length : {A : U0 Val} -> List A -> Int = \l.
+  `(let lengthR : Int -> Int := fix (go l. \acc.
+      case l acc (hd tl. go tl (acc + 1))) l in
+    lengthR 0);
+
+map : {A B : U0 Val} -> (A -> B) -> List A -> List B = \f l.
+  `(fix (go l. case l Nil (hd tl. (f hd) :: go tl)) l);
+
+foldr : {A : U0 Val} {vf : VF} {B : U0 vf} -> (A -> B -> B) -> B -> List A -> B = \cons nil l.
+  `(fix (go l. case l nil (hd tl. cons hd (go tl))) l);
+
+map2 : {A B : U0 Val} -> (A -> B) -> List A -> List B = \{A} f l.
+  foldr {A} {Val} (\hd tl. Cons (f hd) tl) Nil l;
+
+foldl : {A B : U0 Val} -> (B -> A -> B) -> B -> List A -> B = \{A} {B} cons nil l.
+  foldr {A} {Val} {B} (\hd tl. cons tl hd) nil l;
+
+sum2 : List Int -> Int = foldl (\x y. x + y) 0;
+
+foldl2 : {A B : U0 Val} -> (B -> A -> B) -> B -> List A -> B = \{A} {B} cons nil l.
+  `(let foldl2R : B -> B := fix (go l. \acc.
+      case l acc (hd tl. go tl (cons acc hd))) l in
+    foldl2R nil);
+
+sum3 : List Int -> Int = foldl2 (\x y. x + y) 0;
+
+main : Int -> Int := \_. sum3 (map2 (\x. x + 1) test);

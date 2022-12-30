@@ -47,7 +47,14 @@ object Staging:
     case VGlobal0(name: Name)
     case VApp0(fn: Val0, arg: Val0)
     case VLam0(name: Bind, body: Val0 => Val0)
-    case VFix0(go: Name, name: Name, body: (Val0, Val0) => Val0, arg: Val0)
+    case VFix0(
+        t1: Val1,
+        t2: Val1,
+        go: Name,
+        name: Name,
+        body: (Val0, Val0) => Val0,
+        arg: Val0
+    )
     case VLet0(name: Name, vf: Val1, ty: Val1, value: Val0, body: Val0 => Val0)
     case VPair0(fst: Val0, snd: Val0)
     case VFst0(tm: Val0)
@@ -59,6 +66,16 @@ object Staging:
     case VBinop0(op: Op, left: Val0, right: Val0)
     case VNil0(ty: Val1)
     case VCons0(ty: Val1, head: Val0, tail: Val0)
+    case VCaseL0(
+        scrut: Val0,
+        ety: Val1,
+        ty: Val1,
+        vf: Val1,
+        nil: Val0,
+        hd: Bind,
+        tl: Bind,
+        cons: (Val0, Val0) => Val0
+    )
   import Val0.*
 
   private def vvar1(ix: Ix)(implicit env: Env): Val1 =
@@ -91,6 +108,7 @@ object Staging:
     case Global(x)          => eval1(getGlobal(x).get.tm)
     case Let(_, _, _, v, b) => eval1(b)(Def1(env, eval1(v)))
 
+    case VF    => VType1
     case VFVal => VVFVal1
     case VFFun => VVFFun1
     case U0    => VU0
@@ -146,8 +164,15 @@ object Staging:
       VLet0(x, eval1(u), eval1(t), eval0(v), v => eval0Bind(b, v))
 
     case Lam(x, _, b) => VLam0(x, v => eval0Bind(b, v))
-    case Fix(go, x, b, arg) =>
-      VFix0(go, x, (v, w) => eval0(b)(Def0(Def0(env, v), w)), eval0(arg))
+    case Fix(t1, t2, go, x, b, arg) =>
+      VFix0(
+        eval1(t1),
+        eval1(t2),
+        go,
+        x,
+        (v, w) => eval0(b)(Def0(Def0(env, v), w)),
+        eval0(arg)
+      )
     case App(f, a, _) => VApp0(eval0(f), eval0(a))
 
     case Pair(fst, snd) => VPair0(eval0(fst), eval0(snd))
@@ -166,6 +191,17 @@ object Staging:
 
     case NilL(t)          => VNil0(eval1(t))
     case ConsL(t, hd, tl) => VCons0(eval1(t), eval0(hd), eval0(tl))
+    case CaseL(s, et, t, vf, nil, hd, tl, cons) =>
+      VCaseL0(
+        eval0(s),
+        eval1(et),
+        eval1(t),
+        eval1(vf),
+        eval0(nil),
+        hd,
+        tl,
+        (hd, tl) => eval0(cons)(Def0(Def0(env, hd), tl))
+      )
 
     case _ => impossible()
 
@@ -176,7 +212,7 @@ object Staging:
     case Let(name: Name, ty: IR.TDef, value: Tmp, body: Tmp)
 
     case Lam(name: Bind, body: Tmp)
-    case Fix(go: Name, name: Name, body: Tmp, arg: Tmp)
+    case Fix(t1: IR.Ty, t2: IR.TDef, go: Name, name: Name, body: Tmp, arg: Tmp)
     case App(fn: Tmp, arg: Tmp)
 
     case Pair(fst: Tmp, snd: Tmp)
@@ -192,6 +228,15 @@ object Staging:
 
     case NilL(ty: IR.Ty)
     case ConsL(ty: IR.Ty, head: Tmp, tail: Tmp)
+    case CaseL(
+        scrut: Tmp,
+        ety: IR.Ty,
+        ty: IR.TDef,
+        nil: Tmp,
+        hd: Bind,
+        tl: Bind,
+        cons: Tmp
+    )
 
   private def quote0ir(v: Val0)(implicit k: Lvl): Tmp =
     // debug(s"quote0ir $v")
@@ -200,8 +245,10 @@ object Staging:
       case VGlobal0(x) => Tmp.Global(x)
       case VApp0(f, a) => Tmp.App(quote0ir(f), quote0ir(a))
       case VLam0(x, b) => Tmp.Lam(x, quote0ir(b(VVar0(k)))(k + 1))
-      case VFix0(go, x, b, arg) =>
+      case VFix0(t1, t2, go, x, b, arg) =>
         Tmp.Fix(
+          quote1ty(t1),
+          quote1tdefOrTy(t2),
           go,
           x,
           quote0ir(b(VVar0(k), VVar0(k + 1)))(k + 2),
@@ -228,6 +275,16 @@ object Staging:
       case VNil0(t)          => Tmp.NilL(quote1ty(t))
       case VCons0(t, hd, tl) =>
         Tmp.ConsL(quote1ty(t), quote0ir(hd), quote0ir(tl))
+      case VCaseL0(s, et, t, vf, nil, hd, tl, cons) =>
+        Tmp.CaseL(
+          quote0ir(s),
+          quote1ty(et),
+          quote1tdefOrTy(t),
+          quote0ir(nil),
+          hd,
+          tl,
+          quote0ir(cons(VVar0(k), VVar0(k + 1)))(k + 2)
+        )
       case _ => impossible()
 
   private def quote1ty(v: Val1)(implicit k: Lvl): IR.Ty =
@@ -298,18 +355,12 @@ object Staging:
       ctx: Ctx,
       globals: GlobalsTy
   ): IR.Tm =
+    debug(s"check $tm : $ty")
     (tm, ty) match
       case (Tmp.Lam(x, b), IR.TDef(pt :: ps, rt)) =>
         val (n, nctx) = ctx.bind(IR.TDef(pt))
         val eb = check(b, IR.TDef(ps, rt))(nctx, globals)
         IR.Lam(n, pt, IR.TDef(ps, rt), eb)
-      case (Tmp.Fix(go, x, b, arg), rt) =>
-        val (earg, pt) = infer(arg)
-        if pt.params.nonEmpty then impossible()
-        val (n1, nctx1) = ctx.bind(IR.TDef(pt.retrn, rt))
-        val (n2, nctx2) = nctx1.bind(pt)
-        val eb = check(b, rt)(nctx2, globals)
-        IR.Fix(n1, n2, pt.retrn, rt, eb, earg)
       case (Tmp.Let(x, t, v, b), ty) =>
         val ev = check(v, t)
         val (n, nctx) = ctx.bind(t)
@@ -327,74 +378,91 @@ object Staging:
 
   private def infer(
       tm: Tmp
-  )(implicit ctx: Ctx, globals: GlobalsTy): (IR.Tm, IR.TDef) = tm match
-    case Tmp.Local(ix) =>
-      val ty = ctx.types(ix.expose)
-      val n = ctx.names(ix.expose)
-      (IR.Local(n, ty), ty)
-    case Tmp.Global(x) =>
-      val ty = globals(x)
-      (IR.Global(x, ty), ty)
-    case Tmp.Let(x, t, v, b) =>
-      val ev = check(v, t)
-      val (n, nctx) = ctx.bind(t)
-      val (eb, rt) = infer(b)(nctx, globals)
-      (IR.Let(n, t, ev, eb), rt)
+  )(implicit ctx: Ctx, globals: GlobalsTy): (IR.Tm, IR.TDef) =
+    debug(s"infer $tm")
+    tm match
+      case Tmp.Local(ix) =>
+        val ty = ctx.types(ix.expose)
+        val n = ctx.names(ix.expose)
+        (IR.Local(n, ty), ty)
+      case Tmp.Global(x) =>
+        val ty = globals(x)
+        (IR.Global(x, ty), ty)
+      case Tmp.Let(x, t, v, b) =>
+        val ev = check(v, t)
+        val (n, nctx) = ctx.bind(t)
+        val (eb, rt) = infer(b)(nctx, globals)
+        (IR.Let(n, t, ev, eb), rt)
 
-    case Tmp.App(f, a) =>
-      val (ef, ft) = infer(f)
-      ft match
-        case IR.TDef(t :: rest, rt) =>
-          val ea = check(a, t)
-          (IR.App(ef, ea), IR.TDef(rest, rt))
-        case _ => impossible()
+      case Tmp.App(f, a) =>
+        val (ef, ft) = infer(f)
+        ft match
+          case IR.TDef(t :: rest, rt) =>
+            val ea = check(a, t)
+            (IR.App(ef, ea), IR.TDef(rest, rt))
+          case _ => impossible()
 
-    case Tmp.Pair(fst, snd) =>
-      val (efst, fstty) = infer(fst)
-      val (esnd, sndty) = infer(snd)
-      if fstty.params.nonEmpty || sndty.params.nonEmpty then impossible()
-      val t1 = fstty.retrn
-      val t2 = sndty.retrn
-      (IR.Pair(t1, t2, efst, esnd), IR.TDef(IR.TPair(t1, t2)))
-    case Tmp.Fst(t) =>
-      val (et, ty) = infer(t)
-      ty match
-        case IR.TDef(Nil, IR.TPair(fst, _)) => (IR.Fst(fst, et), IR.TDef(fst))
-        case _                              => impossible()
-    case Tmp.Snd(t) =>
-      val (et, ty) = infer(t)
-      ty match
-        case IR.TDef(Nil, IR.TPair(_, snd)) => (IR.Snd(snd, et), IR.TDef(snd))
-        case _                              => impossible()
+      case Tmp.Pair(fst, snd) =>
+        val (efst, fstty) = infer(fst)
+        val (esnd, sndty) = infer(snd)
+        if fstty.params.nonEmpty || sndty.params.nonEmpty then impossible()
+        val t1 = fstty.retrn
+        val t2 = sndty.retrn
+        (IR.Pair(t1, t2, efst, esnd), IR.TDef(IR.TPair(t1, t2)))
+      case Tmp.Fst(t) =>
+        val (et, ty) = infer(t)
+        ty match
+          case IR.TDef(Nil, IR.TPair(fst, _)) => (IR.Fst(fst, et), IR.TDef(fst))
+          case _                              => impossible()
+      case Tmp.Snd(t) =>
+        val (et, ty) = infer(t)
+        ty match
+          case IR.TDef(Nil, IR.TPair(_, snd)) => (IR.Snd(snd, et), IR.TDef(snd))
+          case _                              => impossible()
 
-    case Tmp.True  => (IR.True, IR.TDef(IR.TBool))
-    case Tmp.False => (IR.False, IR.TDef(IR.TBool))
-    case Tmp.If(ty, c, a, b) =>
-      val ec = check(c, IR.TBool)
-      val ea = check(a, ty)
-      val eb = check(b, ty)
-      (IR.If(ty, ec, ea, eb), ty)
+      case Tmp.True  => (IR.True, IR.TDef(IR.TBool))
+      case Tmp.False => (IR.False, IR.TDef(IR.TBool))
+      case Tmp.If(ty, c, a, b) =>
+        val ec = check(c, IR.TBool)
+        val ea = check(a, ty)
+        val eb = check(b, ty)
+        (IR.If(ty, ec, ea, eb), ty)
 
-    case Tmp.IntLit(n) => (IR.IntLit(n), IR.TDef(IR.TInt))
+      case Tmp.IntLit(n) => (IR.IntLit(n), IR.TDef(IR.TInt))
 
-    case Tmp.Binop(op, a, b) =>
-      val ea = check(a, IR.TInt); val eb = check(b, IR.TInt)
-      val rt = op match
-        case OAdd => IR.TInt
-        case OMul => IR.TInt
-        case OSub => IR.TInt
-        case ODiv => IR.TInt
-        case OMod => IR.TInt
-        case _    => IR.TBool
-      (IR.Binop(op, ea, eb), IR.TDef(rt))
+      case Tmp.Binop(op, a, b) =>
+        val ea = check(a, IR.TInt); val eb = check(b, IR.TInt)
+        val rt = op match
+          case OAdd => IR.TInt
+          case OMul => IR.TInt
+          case OSub => IR.TInt
+          case ODiv => IR.TInt
+          case OMod => IR.TInt
+          case _    => IR.TBool
+        (IR.Binop(op, ea, eb), IR.TDef(rt))
 
-    case Tmp.NilL(t) => (IR.NilL(t), IR.TDef(IR.TList(t)))
-    case Tmp.ConsL(t, hd, tl) =>
-      val ehd = check(hd, t)
-      val etl = check(tl, IR.TList(t))
-      (IR.ConsL(t, ehd, etl), IR.TDef(IR.TList(t)))
+      case Tmp.NilL(t) => (IR.NilL(t), IR.TDef(IR.TList(t)))
+      case Tmp.ConsL(t, hd, tl) =>
+        val ehd = check(hd, t)
+        val etl = check(tl, IR.TList(t))
+        (IR.ConsL(t, ehd, etl), IR.TDef(IR.TList(t)))
 
-    case _ => impossible()
+      case Tmp.CaseL(s, et, t, nil, hd, tl, cons) =>
+        val es = check(s, IR.TList(et))
+        val enil = check(nil, t)
+        val (n1, nctx1) = ctx.bind(IR.TDef(et))
+        val (n2, nctx2) = nctx1.bind(IR.TDef(IR.TList(et)))
+        val econs = check(cons, t)(nctx2, globals)
+        (IR.CaseL(es, et, t, enil, n1, n2, econs), t)
+
+      case Tmp.Fix(t1, t2, go, x, b, arg) =>
+        val earg = check(arg, t1)
+        val (n1, nctx1) = ctx.bind(IR.TDef(t1, t2))
+        val (n2, nctx2) = nctx1.bind(IR.TDef(t1))
+        val eb = check(b, t2)(nctx2, globals)
+        (IR.Fix(n1, n2, t1, t2, eb, earg), t2)
+
+      case _ => impossible()
 
   private def stage(d: Def)(implicit globals: GlobalsTy): Option[IR.Def] =
     d match

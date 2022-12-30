@@ -27,7 +27,17 @@ object Value:
     case SProj(spine: Spine, proj: ProjType)
     case SIf(spine: Spine, ty: VTy, ifTrue: Val, ifFalse: Val)
     case SBinop(left: Spine, op: Op, right: Val)
-    case SFix(go: Name, name: Name, body: Clos2, arg: Spine)
+    case SFix(t1: VTy, t2: VTy, go: Name, name: Name, body: Clos2, arg: Spine)
+    case SCaseL(
+        scrut: Spine,
+        ety: VTy,
+        ty: VTy,
+        vf: VTy,
+        nil: Val,
+        x: Bind,
+        y: Bind,
+        cons: Clos2
+    )
   export Spine.*
 
   enum Head:

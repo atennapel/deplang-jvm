@@ -38,12 +38,25 @@ object Unification:
       case SProj(sp, p)     => Proj(goSp(hd, sp), p)
       case SIf(sp, t, a, b) => If(go(t), goSp(hd, sp), go(a), go(b))
       case SBinop(a, op, b) => Binop(op, goSp(hd, a), go(b))
-      case SFix(g, x, b, sp) =>
+      case SFix(t1, t2, g, x, b, sp) =>
         Fix(
+          go(t1),
+          go(t2),
           g,
           x,
           go(b(VVar(pren.cod), VVar(pren.cod + 1)))(pren.lift.lift),
           goSp(hd, sp)
+        )
+      case SCaseL(sp, et, t, vf, nil, x, y, cons) =>
+        CaseL(
+          goSp(hd, sp),
+          go(et),
+          go(t),
+          go(vf),
+          go(nil),
+          x,
+          y,
+          go(cons(VVar(pren.cod), VVar(pren.cod + 1)))(pren.lift.lift)
         )
 
     def goCl(c: Clos)(implicit pren: PRen): Tm =
@@ -140,10 +153,18 @@ object Unification:
       unify(sp1, sp2); unify(t1, t2); unify(a1, a2); unify(b1, b2)
     case (SBinop(a1, op1, b1), SBinop(a2, op2, b2)) if op1 == op2 =>
       unify(a1, a2); unify(b1, b2)
-    case (SFix(_, _, b1, sp1), SFix(_, _, b2, sp2)) =>
+    case (SFix(_, _, _, _, b1, sp1), SFix(_, _, _, _, b2, sp2)) =>
       unify(sp1, sp2)
       val v = VVar(k); val w = VVar(k + 1)
       unify(b1(v, w), b2(v, w))(k + 2)
+    case (
+          SCaseL(sp1, _, _, _, nil1, _, _, cons1),
+          SCaseL(sp2, _, _, _, nil2, _, _, cons2)
+        ) =>
+      unify(sp1, sp2)
+      unify(nil1, nil2)
+      val v = VVar(k); val w = VVar(k + 1)
+      unify(cons1(v, w), cons2(v, w))(k + 2)
     case _ => throw UnifyError("spine mismatch")
 
   private def unify(a: Clos, b: Clos)(implicit k: Lvl): Unit =

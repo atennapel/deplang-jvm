@@ -32,7 +32,7 @@ object Syntax:
     case Pi(name: Bind, icit: Icit, ty: Ty, u1: Ty, body: Ty, u2: Ty)
     case Lam(name: Bind, icit: Icit, body: Tm)
     case App(fn: Tm, arg: Tm, icit: Icit)
-    case Fix(go: Name, name: Name, body: Tm, arg: Tm)
+    case Fix(t1: Ty, t2: Ty, go: Name, name: Name, body: Tm, arg: Tm)
 
     case Sigma(name: Bind, ty: Ty, u1: Ty, body: Ty, u2: Ty)
     case Proj(tm: Tm, proj: ProjType)
@@ -56,6 +56,16 @@ object Syntax:
     case ListTy(ty: Ty)
     case NilL(ty: Ty)
     case ConsL(ty: Ty, head: Tm, tail: Tm)
+    case CaseL(
+        scrut: Tm,
+        ety: Ty,
+        ty: Ty,
+        vf: Ty,
+        nil: Tm,
+        x: Bind,
+        y: Bind,
+        cons: Tm
+    )
 
     case Meta(id: MetaId)
     case InsertedMeta(id: MetaId, bds: BDs)
@@ -85,7 +95,7 @@ object Syntax:
       case Lam(x, Impl, b)                   => s"(\\{$x}. $b)"
       case App(f, a, Expl)                   => s"($f $a)"
       case App(f, a, Impl)                   => s"($f {$a})"
-      case Fix(go, x, b, arg)                => s"(fix ($go $x. $b) $arg)"
+      case Fix(_, _, go, x, b, arg)          => s"(fix ($go $x. $b) $arg)"
 
       case Sigma(DontBind, t, u1, b, u2)  => s"($t **{$u1}{$u2} $b)"
       case Sigma(DoBind(x), t, u1, b, u2) => s"(($x : $t) **{$u1}{$u2} $b)"
@@ -107,9 +117,10 @@ object Syntax:
       case IntLit(v)       => s"$v"
       case Binop(op, a, b) => s"($a $op $b)"
 
-      case ListTy(t)        => s"(List $t)"
-      case NilL(t)          => s"Nil"
-      case ConsL(t, hd, tl) => s"(Cons $hd $tl)"
+      case ListTy(t)                     => s"(List $t)"
+      case NilL(t)                       => s"Nil"
+      case ConsL(t, hd, tl)              => s"(Cons $hd $tl)"
+      case CaseL(s, _, _, _, n, x, y, c) => s"(case $s $n ($x $y. $c))"
 
       case Meta(id)            => s"?$id"
       case InsertedMeta(id, _) => s"?$id"

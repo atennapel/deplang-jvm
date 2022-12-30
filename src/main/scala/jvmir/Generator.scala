@@ -1,6 +1,7 @@
 package jvmir
 
 import common.Common.*
+import common.Debug.debug
 import Syntax.*
 
 import org.objectweb.asm.*
@@ -20,6 +21,16 @@ import java.io.BufferedOutputStream
 import java.io.FileOutputStream
 
 object Generator:
+  // from https://stackoverflow.com/questions/8104479/how-to-find-the-longest-common-prefix-of-two-strings-in-scala
+  private def longestCommonPrefix(a: String, b: String): String = {
+    var same = true
+    var i = 0
+    while same && i < math.min(a.length, b.length) do
+      if a.charAt(i) != b.charAt(i) then same = false
+      else i += 1
+    a.substring(0, i)
+  }
+
   private final case class Ctx(moduleName: String, moduleType: Type)
 
   private val tcons: mutable.Map[Name, Type] = mutable.Map.empty
@@ -28,7 +39,16 @@ object Generator:
   def generate(moduleName: String, ds: Defs): Unit =
     implicit val cw: ClassWriter = new ClassWriter(
       ClassWriter.COMPUTE_MAXS + ClassWriter.COMPUTE_FRAMES
-    )
+    ) {
+      override protected def getCommonSuperClass(
+          type1: String,
+          type2: String
+      ): String =
+        val prefix = longestCommonPrefix(type1, type2)
+        val ret = if prefix.endsWith("$") then prefix.init else prefix
+        debug(s"getCommonSuperClass $type1 $type2 $prefix $ret")
+        ret
+    }
     cw.visit(V1_8, ACC_PUBLIC, moduleName, null, "java/lang/Object", null)
 
     implicit val ctx: Ctx = Ctx(moduleName, Type.getType(s"L$moduleName;"))
@@ -237,6 +257,29 @@ object Generator:
             List(OBJECT_TYPE, LIST_TYPE).toArray
           )
         )
+      case CaseL(s, et, nil, hd, tl, cons) =>
+        val lEnd = mg.newLabel()
+        val lElse = mg.newLabel()
+        gen(s)
+        mg.dup()
+        mg.getStatic(LIST_TYPE, "NIL", LIST_TYPE)
+        mg.ifCmp(LIST_TYPE, GeneratorAdapter.EQ, lElse)
+        mg.checkCast(CONS_TYPE)
+        mg.dup()
+        mg.getField(CONS_TYPE, "head", OBJECT_TYPE)
+        val get = gen(et)
+        mg.unbox(get)
+        val lhd = mg.newLocal(get)
+        mg.storeLocal(lhd)
+        mg.getField(CONS_TYPE, "tail", LIST_TYPE)
+        val ltl = mg.newLocal(LIST_TYPE)
+        mg.storeLocal(ltl)
+        gen(cons)(mg, ctx, locals + (hd -> lhd) + (tl -> ltl), methodStart)
+        mg.visitJumpInsn(GOTO, lEnd)
+        mg.visitLabel(lElse)
+        mg.pop()
+        gen(nil)
+        mg.visitLabel(lEnd)
 
       case True  => mg.push(true)
       case False => mg.push(false)

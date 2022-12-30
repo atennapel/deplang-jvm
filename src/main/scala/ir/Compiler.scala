@@ -110,6 +110,16 @@ object Compiler:
       case ConsL(t, hd, tl) =>
         IR.ConsL(go(t), box(t, go(hd, false)), go(tl, false))
 
+      case CaseL(s, et, TDef(Nil, t), nil, hd, tl, cons) =>
+        IR.CaseL(
+          go(s, false),
+          go(et),
+          go(nil, tr),
+          hd,
+          tl,
+          go(cons, tr)(name, args - hd - tl, defs, uniq)
+        )
+
       case _ => impossible()
 
   private def box(ty: Ty, tm: IR.Tm): IR.Tm = ty match

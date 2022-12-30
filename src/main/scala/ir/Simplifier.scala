@@ -99,6 +99,31 @@ object Simplifier:
             case None         => Some(If(t, c, a, b))
         case None => go2(a, b).map(If(t, c, _, _))
 
+    case CaseL(NilL(_), _, _, nil, _, _, _) => Some(nil)
+    case CaseL(ConsL(_, hd, tl), et, _, _, xhd, xtl, cons) =>
+      Some(Let(xhd, TDef(et), hd, Let(xtl, TDef(TList(et)), tl, cons)))
+
+    case CaseL(s, et, TDef(ps, rt), nil, hd, tl, cons) if ps.nonEmpty =>
+      val (vs, innerscope) =
+        ps.foldLeft[(List[(Int, Ty)], Set[Int])]((Nil, scope + hd + tl)) {
+          case ((vs, scope), ty) =>
+            val x = fresh(scope)
+            (vs ++ List((x, ty)), scope + x)
+        }
+      val spine = vs.map((x, t) => Local(x, TDef(t)))
+      val enil = nil.apps(spine)
+      val econs = cons.apps(spine)
+      Some(CaseL(s, et, TDef(rt), enil, hd, tl, econs).lams(vs, TDef(rt)))
+
+    case CaseL(s, et, t, nil, hd, tl, cons) =>
+      go2(s, nil) match
+        case Some((s, nil)) =>
+          go(cons)(scope + hd + tl) match
+            case Some(cons) => Some(CaseL(s, et, t, nil, hd, tl, cons))
+            case None       => Some(CaseL(s, et, t, nil, hd, tl, cons))
+        case None =>
+          go(cons)(scope + hd + tl).map(CaseL(s, et, t, nil, hd, tl, _))
+
   private def binop(op: Op, a: Tm, b: Tm): Option[Tm] = (op, a, b) match
     case (OAdd, IntLit(a), IntLit(b)) => Some(IntLit(a + b))
     case (OAdd, IntLit(0), b)         => Some(b)

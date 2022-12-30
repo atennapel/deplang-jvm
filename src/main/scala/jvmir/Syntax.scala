@@ -42,6 +42,7 @@ object Syntax:
 
     case NilL(ty: Ty)
     case ConsL(ty: Ty, head: Tm, tail: Tm)
+    case CaseL(scrut: Tm, et: Ty, nil: Tm, hd: Int, tl: Int, cons: Tm)
 
     case Box(ty: Ty, tm: Tm)
     case Unbox(ty: Ty, tm: Tm)
@@ -68,6 +69,8 @@ object Syntax:
 
       case NilL(_)          => "Nil"
       case ConsL(_, hd, tl) => s"(Cons $hd $tl)"
+      case CaseL(scrut, _, nil, hd, tl, cons) =>
+        s"(case $scrut $nil ($hd $tl. $cons))"
 
       case Box(ty, tm)   => s"(box {$ty} $tm)"
       case Unbox(ty, tm) => s"(unbox {$ty} $tm)"

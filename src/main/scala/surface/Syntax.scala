@@ -34,6 +34,8 @@ object Syntax:
 
     case If(cond: Tm, ifTrue: Tm, ifFalse: Tm)
 
+    case CaseL(scrut: Tm, nil: Tm, head: Bind, tail: Bind, cons: Tm)
+
     case IntLit(value: Int)
 
     case Hole(name: Option[Name])
@@ -77,6 +79,8 @@ object Syntax:
 
       case If(c, a, b) => s"(if $c then $a else $b)"
 
+      case CaseL(a, n, x, y, c) => s"(case $a $n ($x $y. $c))"
+
       case IntLit(n) => s"$n"
 
       case Hole(Some(x)) => s"_$x"
@@ -89,6 +93,8 @@ object Syntax:
       case _         => false
 
     def removePos: Tm = this match
+      case Pos(_, t) => t.removePos
+
       case Let(x, s, t, v, b) =>
         Let(x, s, t.map(_.removePos), v.removePos, b.removePos)
 
@@ -107,7 +113,8 @@ object Syntax:
 
       case If(c, a, b) => If(c.removePos, a.removePos, b.removePos)
 
-      case Pos(_, t) => t.removePos
+      case CaseL(a, n, x, y, c) =>
+        CaseL(a.removePos, n.removePos, x, y, c.removePos)
 
       case _ => this
   export Tm.*

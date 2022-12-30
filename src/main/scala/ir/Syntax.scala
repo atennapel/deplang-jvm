@@ -46,6 +46,15 @@ object Syntax:
 
     case NilL(ty: Ty)
     case ConsL(ty: Ty, head: Tm, tail: Tm)
+    case CaseL(
+        scrut: Tm,
+        ety: Ty,
+        ty: TDef,
+        nil: Tm,
+        hd: Int,
+        tl: Int,
+        cons: Tm
+    )
 
     override def toString: String = this match
       case Local(x, _)  => s"'$x"
@@ -70,6 +79,8 @@ object Syntax:
 
       case NilL(t)          => s"Nil"
       case ConsL(t, hd, tl) => s"(Cons $hd $tl)"
+      case CaseL(s, _, _, nil, hd, tl, cons) =>
+        s"(case $s $nil ($hd $tl. $cons))"
 
     def flattenLams: (List[(Int, Ty)], Option[Ty], Tm) =
       def go(t: Tm): (List[(Int, Ty)], Option[Ty], Tm) = t match
@@ -111,6 +122,10 @@ object Syntax:
       case Binop(_, a, b) => a.freeVars ++ b.freeVars
 
       case ConsL(_, hd, tl) => hd.freeVars ++ tl.freeVars
+      case CaseL(s, _, _, nil, hd, tl, cons) =>
+        s.freeVars ++ nil.freeVars ++ cons.freeVars.filterNot((y, _) =>
+          y == hd || y == tl
+        )
 
       case _ => Nil
 
@@ -156,8 +171,8 @@ object Syntax:
           t1,
           t2,
           b.subst(
-            sub + (go -> Local(go2, TDef(t1, t2))),
-            scope + go2
+            sub - x + (go -> Local(go2, TDef(t1, t2))),
+            scope + x + go2
           ),
           arg.subst(sub, scope)
         )
@@ -170,8 +185,8 @@ object Syntax:
           t1,
           t2,
           b.subst(
-            sub + (x -> Local(x2, TDef(t1))),
-            scope + x2
+            sub - go + (x -> Local(x2, TDef(t1))),
+            scope + x2 + go
           ),
           arg.subst(sub, scope)
         )
@@ -203,6 +218,69 @@ object Syntax:
 
       case ConsL(t, hd, tl) =>
         ConsL(t, hd.subst(sub, scope), tl.subst(sub, scope))
+
+      case CaseL(s, et, t, nil, hd, tl, cons)
+          if !scope.contains(hd) && !scope.contains(tl) =>
+        CaseL(
+          s.subst(sub, scope),
+          et,
+          t,
+          nil.subst(sub, scope),
+          hd,
+          tl,
+          cons.subst(sub - hd - tl, scope + hd + tl)
+        )
+      case CaseL(s, et, t, nil, hd, tl, cons)
+          if scope.contains(hd) && !scope.contains(tl) =>
+        val hd2 = scope.max + 1
+        CaseL(
+          s.subst(sub, scope),
+          et,
+          t,
+          nil.subst(sub, scope),
+          hd2,
+          tl,
+          cons.subst(
+            sub - tl + (hd -> Local(hd2, TDef(et))),
+            scope + hd2 + tl
+          )
+        )
+      case CaseL(s, et, t, nil, hd, tl, cons)
+          if !scope.contains(hd) && scope.contains(tl) =>
+        val tl2 = scope.max + 1
+        CaseL(
+          s.subst(sub, scope),
+          et,
+          t,
+          nil.subst(sub, scope),
+          hd,
+          tl2,
+          cons.subst(
+            sub - hd + (tl -> Local(
+              tl2,
+              TDef(TList(et))
+            )),
+            scope + hd + tl2
+          )
+        )
+      case CaseL(s, et, t, nil, hd, tl, cons) =>
+        val hd2 = scope.max + 1
+        val tl2 = (scope + hd2).max + 1
+        CaseL(
+          s.subst(sub, scope),
+          et,
+          t,
+          nil.subst(sub, scope),
+          hd2,
+          tl2,
+          cons.subst(
+            sub + (hd -> Local(hd2, TDef(et))) + (tl -> Local(
+              tl2,
+              TDef(TList(et))
+            )),
+            scope + hd2 + tl2
+          )
+        )
 
       case _ => this
   export Tm.*

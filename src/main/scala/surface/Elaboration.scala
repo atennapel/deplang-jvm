@@ -114,7 +114,7 @@ object Elaboration:
     ): Option[Tm] =
       tryAdjustStage(t, a, st1, st2) match
         case None         => unify(st1, st2); unify(a, b); None
-        case Some((t, a)) => unify(st1, st2); unify(a, b); Some(t)
+        case Some((t, a)) => unify(a, b); Some(t)
     def go(
         t: Tm,
         a: VTy,
@@ -256,7 +256,20 @@ object Elaboration:
         val eb = check(b, ty, univ)(
           ctx.bind(DoBind(go), fun, VUFun()).bind(DoBind(x), vt, VUVal())
         )
-        Fix(go, x, eb, ea)
+        Fix(ctx.quote(vt), ctx.quote(ty), go, x, eb, ea)
+
+      case (S.CaseL(scrut, nil, hd, tl, cons), _) =>
+        val vf = force(univ) match
+          case VU(vf) => vf
+          case _      => throw ElaborateError(s"case has to return in U0")
+        val ety = newMeta()
+        val evt = ctx.eval(ety)
+        val escrut = check(scrut, VList(evt), VUVal())
+        val enil = check(nil, ty, univ)
+        val econs = check(cons, ty, univ)(
+          ctx.bind(hd, evt, VUVal()).bind(tl, VList(evt), VUVal())
+        )
+        CaseL(escrut, ety, ctx.quote(ty), ctx.quote(vf), enil, hd, tl, econs)
 
       case (tm, _) =>
         val (etm, ty2, univ2) = insert(infer(tm))
@@ -495,7 +508,7 @@ object Elaboration:
         val eb = check(b, rt, u)(
           ctx.bind(DoBind(go), fun, VUFun()).bind(DoBind(x), vt, VUVal())
         )
-        (Fix(go, x, eb, ea), rt, u)
+        (Fix(ctx.quote(vt), ctx.quote(rt), go, x, eb, ea), rt, u)
       case _ => throw ElaborateError(s"cannot infer $tm")
 
   private def elaborate(tm: S.Tm, ty: Option[S.Ty], u: VTy): (Tm, Ty) =

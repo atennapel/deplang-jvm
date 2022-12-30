@@ -94,22 +94,58 @@ object Evaluation:
       VGlobal(x, SBinop(sp, op, b), () => vbinop(op, v(), b))
     case _ => impossible()
 
-  def vfix(go: Name, x: Name, body: Clos2, arg: Val): Val = arg match
-    case VRigid(hd, sp) => VRigid(hd, SFix(go, x, body, sp))
-    case VFlex(hd, sp)  => VFlex(hd, SFix(go, x, body, sp))
-    case VGlobal(x, sp, v) =>
-      VGlobal(x, SFix(go, x, body, sp), () => vfix(go, x, body, v()))
-    case v =>
-      body(VLam(DoBind(Name("x")), Expl, CFun(a => vfix(go, x, body, a))), v)
+  def vfix(t1: VTy, t2: VTy, go: Name, x: Name, body: Clos2, arg: Val): Val =
+    arg match
+      case VRigid(hd, sp) => VRigid(hd, SFix(t1, t2, go, x, body, sp))
+      case VFlex(hd, sp)  => VFlex(hd, SFix(t1, t2, go, x, body, sp))
+      case VGlobal(x, sp, v) =>
+        VGlobal(
+          x,
+          SFix(t1, t2, go, x, body, sp),
+          () => vfix(t1, t2, go, x, body, v())
+        )
+      case v =>
+        body(
+          VLam(
+            DoBind(Name("x")),
+            Expl,
+            CFun(a => vfix(t1, t2, go, x, body, a))
+          ),
+          v
+        )
+
+  def vcaseL(
+      scrut: Val,
+      ety: VTy,
+      ty: VTy,
+      vf: VTy,
+      nil: Val,
+      x: Bind,
+      y: Bind,
+      cons: Clos2
+  ): Val = scrut match
+    case VNil(_)          => nil
+    case VCons(_, hd, tl) => cons(hd, tl)
+    case VRigid(hd, sp) => VRigid(hd, SCaseL(sp, ety, ty, vf, nil, x, y, cons))
+    case VFlex(hd, sp)  => VFlex(hd, SCaseL(sp, ety, ty, vf, nil, x, y, cons))
+    case VGlobal(g, sp, v) =>
+      VGlobal(
+        g,
+        SCaseL(sp, ety, ty, vf, nil, x, y, cons),
+        () => vcaseL(v(), ety, ty, vf, nil, x, y, cons)
+      )
+    case _ => impossible()
 
   def vspine(v: Val, sp: Spine): Val = sp match
-    case SId                => v
-    case SApp(sp, a, i)     => vapp(vspine(v, sp), a, i)
-    case SSplice(sp)        => vsplice(vspine(v, sp))
-    case SProj(sp, p)       => vproj(vspine(v, sp), p)
-    case SIf(sp, t, a, b)   => vif(vspine(v, sp), t, a, b)
-    case SBinop(a, op, b)   => vbinop(op, vspine(v, sp), b)
-    case SFix(go, x, b, sp) => vfix(go, x, b, vspine(v, sp))
+    case SId                        => v
+    case SApp(sp, a, i)             => vapp(vspine(v, sp), a, i)
+    case SSplice(sp)                => vsplice(vspine(v, sp))
+    case SProj(sp, p)               => vproj(vspine(v, sp), p)
+    case SIf(sp, t, a, b)           => vif(vspine(v, sp), t, a, b)
+    case SBinop(a, op, b)           => vbinop(op, vspine(v, sp), b)
+    case SFix(t1, t2, go, x, b, sp) => vfix(t1, t2, go, x, b, vspine(v, sp))
+    case SCaseL(sp, et, t, vf, n, x, y, c) =>
+      vcaseL(vspine(v, sp), et, t, vf, n, x, y, c)
 
   def vmeta(id: MetaId): Val = getMeta(id) match
     case Unsolved     => VMeta(id)
@@ -139,9 +175,10 @@ object Evaluation:
 
     case Pi(x, i, t, u1, b, u2) =>
       VPi(x, i, eval(t), eval(u1), Clos(b), eval(u2))
-    case Lam(x, i, b)       => VLam(x, i, Clos(b))
-    case App(f, a, i)       => vapp(eval(f), eval(a), i)
-    case Fix(go, x, b, arg) => vfix(go, x, CClos2(env, b), eval(arg))
+    case Lam(x, i, b) => VLam(x, i, Clos(b))
+    case App(f, a, i) => vapp(eval(f), eval(a), i)
+    case Fix(t1, t2, go, x, b, arg) =>
+      vfix(eval(t1), eval(t2), go, x, CClos2(env, b), eval(arg))
 
     case Sigma(x, t, u1, b, u2) =>
       VSigma(x, eval(t), eval(u1), Clos(b), eval(u2))
@@ -166,6 +203,17 @@ object Evaluation:
     case ListTy(t)        => VList(eval(t))
     case NilL(t)          => VNil(eval(t))
     case ConsL(t, hd, tl) => VCons(eval(t), eval(hd), eval(tl))
+    case CaseL(scrut, ety, ty, vf, nil, x, y, cons) =>
+      vcaseL(
+        eval(scrut),
+        eval(ety),
+        eval(ty),
+        eval(vf),
+        eval(nil),
+        x,
+        y,
+        CClos2(env, cons)
+      )
 
     case Meta(id)              => vmeta(id)
     case InsertedMeta(id, bds) => vappbds(vmeta(id), bds)
@@ -198,12 +246,25 @@ object Evaluation:
           quote(b, unfold)
         )
       case SBinop(a, op, b) => Binop(op, quote(hd, a, unfold), quote(b, unfold))
-      case SFix(go, x, b, v) =>
+      case SFix(t1, t2, go, x, b, v) =>
         Fix(
+          quote(t1, unfold),
+          quote(t2, unfold),
           go,
           x,
           quote(b(VVar(k), VVar(k + 1)), unfold)(k + 2),
           quote(hd, v, unfold)
+        )
+      case SCaseL(sp, ety, ty, vf, nil, x, y, cons) =>
+        CaseL(
+          quote(hd, sp, unfold),
+          quote(ety, unfold),
+          quote(ty, unfold),
+          quote(vf, unfold),
+          quote(nil, unfold),
+          x,
+          y,
+          quote(cons(VVar(k), VVar(k + 1)), unfold)(k + 2)
         )
 
   private def quote(b: Clos, unfold: Unfold)(implicit k: Lvl): Tm =

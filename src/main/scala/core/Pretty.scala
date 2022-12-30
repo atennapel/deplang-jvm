@@ -93,7 +93,7 @@ object Pretty:
     case Pi(_, _, _, _, _, _) => prettyPi(tm)
     case Lam(_, _, _)         => prettyLam(tm)
     case App(_, _, _)         => prettyApp(tm)
-    case Fix(go0, x0, b, arg) =>
+    case Fix(_, _, go0, x0, b, arg) =>
       val go = go0.fresh
       val x = x0.fresh(go :: ns)
       s"fix ($go $x. ${pretty(b)(x :: go :: ns)}) ${prettyParen(arg)}"
@@ -123,6 +123,10 @@ object Pretty:
     case ListTy(t)        => s"List ${prettyParen(t)}"
     case NilL(t)          => s"Nil"
     case ConsL(t, hd, tl) => s"Cons $hd $tl"
+    case CaseL(s, _, _, _, n, x0, y0, c) =>
+      val x = x0.fresh
+      val y = y0.fresh(x.toName :: ns)
+      s"case ${prettyParen(s)} ${prettyParen(n)} ($x $y. ${pretty(c)(y.toName :: x.toName :: ns)})"
 
     case Meta(id)            => s"?$id"
     case InsertedMeta(id, _) => s"?$id"

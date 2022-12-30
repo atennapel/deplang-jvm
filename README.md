@@ -43,10 +43,10 @@ TODO:
 - [x] Add Int and primitive binops
 - [x] Remove Nat
 - [x] Tail recursion
-- [ ] Primitive polymorphic list datatype
+- [x] Primitive polymorphic list datatype
   - [x] Type
   - [x] Constructors
-  - [ ] Elimination
+  - [x] Elimination
 - [ ] More simplification: case-of-case, app and case commutation
 - [ ] Better inlining (inline linear lambdas, constants, globals)
 - [ ] Combine jumps (for example if+comparisons)
