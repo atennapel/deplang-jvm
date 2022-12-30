@@ -45,7 +45,7 @@ TODO:
 - [x] Tail recursion
 - [ ] Primitive polymorphic list datatype
   - [x] Type
-  - [ ] Constructors
+  - [x] Constructors
   - [ ] Elimination
 - [ ] More simplification: case-of-case, app and case commutation
 - [ ] Better inlining (inline linear lambdas, constants, globals)

@@ -54,6 +54,8 @@ object Syntax:
     case Binop(op: Op, left: Tm, right: Tm)
 
     case ListTy(ty: Ty)
+    case NilL(ty: Ty)
+    case ConsL(ty: Ty, head: Tm, tail: Tm)
 
     case Meta(id: MetaId)
     case InsertedMeta(id: MetaId, bds: BDs)
@@ -105,7 +107,9 @@ object Syntax:
       case IntLit(v)       => s"$v"
       case Binop(op, a, b) => s"($a $op $b)"
 
-      case ListTy(t) => s"(List $t)"
+      case ListTy(t)        => s"(List $t)"
+      case NilL(t)          => s"Nil"
+      case ConsL(t, hd, tl) => s"(Cons $hd $tl)"
 
       case Meta(id)            => s"?$id"
       case InsertedMeta(id, _) => s"?$id"

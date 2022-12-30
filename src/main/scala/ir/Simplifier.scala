@@ -72,6 +72,9 @@ object Simplifier:
         case Some(t) => Some(t)
         case None    => go2(a, b).map(Binop(op, _, _))
 
+    case NilL(_)          => None
+    case ConsL(t, hd, tl) => go2(hd, tl).map(ConsL(t, _, _))
+
     case If(t, True, a, b)  => Some(a)
     case If(t, False, a, b) => Some(b)
 

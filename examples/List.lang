@@ -1,2 +1,6 @@
 listid : {A : U0 Val} -> List A -> List A = \x. x;
 listid2 : List Int -> List Int := \x. listid x;
+
+(::) : {A : U0 Val} -> A -> List A -> List A = \hd tl. Cons hd tl;
+
+test : List Int ::= 1 :: 2 :: 3 :: Nil;

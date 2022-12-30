@@ -57,6 +57,8 @@ object Staging:
     case VIf0(ty: Val1, cond: Val0, ifTrue: Val0, ifFalse: Val0)
     case VIntLit0(value: Int)
     case VBinop0(op: Op, left: Val0, right: Val0)
+    case VNil0(ty: Val1)
+    case VCons0(ty: Val1, head: Val0, tail: Val0)
   import Val0.*
 
   private def vvar1(ix: Ix)(implicit env: Env): Val1 =
@@ -162,6 +164,9 @@ object Staging:
     case IntLit(n)       => VIntLit0(n)
     case Binop(op, a, b) => VBinop0(op, eval0(a), eval0(b))
 
+    case NilL(t)          => VNil0(eval1(t))
+    case ConsL(t, hd, tl) => VCons0(eval1(t), eval0(hd), eval0(tl))
+
     case _ => impossible()
 
   // staging
@@ -184,6 +189,9 @@ object Staging:
 
     case IntLit(value: Int)
     case Binop(op: Op, left: Tmp, right: Tmp)
+
+    case NilL(ty: IR.Ty)
+    case ConsL(ty: IR.Ty, head: Tmp, tail: Tmp)
 
   private def quote0ir(v: Val0)(implicit k: Lvl): Tmp =
     // debug(s"quote0ir $v")
@@ -217,7 +225,10 @@ object Staging:
         Tmp.If(quote1tdefOrTy(t), quote0ir(c), quote0ir(a), quote0ir(b))
       case VIntLit0(n)       => Tmp.IntLit(n)
       case VBinop0(op, a, b) => Tmp.Binop(op, quote0ir(a), quote0ir(b))
-      case _                 => impossible()
+      case VNil0(t)          => Tmp.NilL(quote1ty(t))
+      case VCons0(t, hd, tl) =>
+        Tmp.ConsL(quote1ty(t), quote0ir(hd), quote0ir(tl))
+      case _ => impossible()
 
   private def quote1ty(v: Val1)(implicit k: Lvl): IR.Ty =
     // debug(s"quote1ty $v")
@@ -376,6 +387,12 @@ object Staging:
         case OMod => IR.TInt
         case _    => IR.TBool
       (IR.Binop(op, ea, eb), IR.TDef(rt))
+
+    case Tmp.NilL(t) => (IR.NilL(t), IR.TDef(IR.TList(t)))
+    case Tmp.ConsL(t, hd, tl) =>
+      val ehd = check(hd, t)
+      val etl = check(tl, IR.TList(t))
+      (IR.ConsL(t, ehd, etl), IR.TDef(IR.TList(t)))
 
     case _ => impossible()
 

@@ -318,6 +318,16 @@ object Elaboration:
       case S.Var(Name("False")) => (False, VBool, VUVal())
       case S.Var(Name("Int"))   => (IntTy, VUVal(), VU1)
       case S.IntLit(n)          => (IntLit(n), VInt, VUVal())
+      case S.Var(Name("Nil")) =>
+        val m = newMeta()
+        val mv = ctx.eval(m)
+        (NilL(m), VList(mv), VUVal())
+      case S.App(S.App(S.Var(Name("Cons")), hd, Expl), tl, Expl) =>
+        val m = newMeta()
+        val mv = ctx.eval(m)
+        val ehd = check(hd, mv, VUVal())
+        val etl = check(tl, VList(mv), VUVal())
+        (ConsL(m, ehd, etl), VList(mv), VUVal())
       case S.App(S.Var(Name("List")), t, Expl) =>
         val et = check(t, VUVal(), VU1)
         (ListTy(et), VUVal(), VU1)

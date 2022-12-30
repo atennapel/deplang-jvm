@@ -101,6 +101,7 @@ object Generator:
 
   private val PAIR_TYPE: Type = Type.getType("Ljvmstd/Pair;")
   private val LIST_TYPE: Type = Type.getType("Ljvmstd/List;")
+  private val CONS_TYPE: Type = Type.getType("Ljvmstd/List$Cons;")
   private val OBJECT_TYPE: Type = Type.getType("Ljava/lang/Object;")
 
   private def gen(t: Ty)(implicit ctx: Ctx): Type = t match
@@ -221,6 +222,21 @@ object Generator:
       case Snd(tm)       => gen(tm); mg.getField(PAIR_TYPE, "snd", OBJECT_TYPE)
       case Box(ty, tm)   => gen(tm); box(ty)
       case Unbox(ty, tm) => gen(tm); mg.unbox(gen(ty))
+
+      case NilL(t) => mg.getStatic(LIST_TYPE, "NIL", LIST_TYPE)
+      case ConsL(t, hd, tl) =>
+        mg.newInstance(CONS_TYPE)
+        mg.dup()
+        gen(hd)
+        gen(tl)
+        mg.invokeConstructor(
+          CONS_TYPE,
+          new Method(
+            "<init>",
+            Type.VOID_TYPE,
+            List(OBJECT_TYPE, LIST_TYPE).toArray
+          )
+        )
 
       case True  => mg.push(true)
       case False => mg.push(false)

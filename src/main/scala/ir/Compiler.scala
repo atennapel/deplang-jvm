@@ -106,6 +106,10 @@ object Compiler:
       case If(TDef(Nil, t), c, a, b) =>
         IR.If(go(t), go(c, false), go(a, tr), go(b, tr))
 
+      case NilL(t) => IR.NilL(go(t))
+      case ConsL(t, hd, tl) =>
+        IR.ConsL(go(t), box(t, go(hd, false)), go(tl, false))
+
       case _ => impossible()
 
   private def box(ty: Ty, tm: IR.Tm): IR.Tm = ty match

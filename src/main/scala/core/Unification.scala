@@ -99,7 +99,9 @@ object Unification:
       case VInt       => IntTy
       case VIntLit(v) => IntLit(v)
 
-      case VList(t) => ListTy(go(t))
+      case VList(t)         => ListTy(go(t))
+      case VNil(t)          => NilL(go(t))
+      case VCons(t, hd, tl) => ConsL(go(t), go(hd), go(tl))
 
     go(v)
 
@@ -162,6 +164,9 @@ object Unification:
       case (VLift(_, a), VLift(_, b))         => unify(a, b)
       case (VQuote(a), VQuote(b))             => unify(a, b)
       case (VList(a), VList(b))               => unify(a, b)
+      case (VNil(a), VNil(b))                 => unify(a, b)
+      case (VCons(a1, b1, c1), VCons(a2, b2, c2)) =>
+        unify(a1, a2); unify(b1, b2); unify(c1, c2)
       case (VPi(_, _, t1, u11, b1, u12), VPi(_, _, t2, u21, b2, u22)) =>
         unify(t1, t2); unify(u11, u21); unify(b1, b2); unify(u12, u22)
       case (VSigma(_, t1, u11, b1, u12), VSigma(_, t2, u21, b2, u22)) =>

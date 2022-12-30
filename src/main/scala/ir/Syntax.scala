@@ -44,6 +44,9 @@ object Syntax:
     case IntLit(value: Int)
     case Binop(op: Op, left: Tm, right: Tm)
 
+    case NilL(ty: Ty)
+    case ConsL(ty: Ty, head: Tm, tail: Tm)
+
     override def toString: String = this match
       case Local(x, _)  => s"'$x"
       case Global(x, _) => s"$x"
@@ -64,6 +67,9 @@ object Syntax:
 
       case IntLit(n)       => s"$n"
       case Binop(op, a, b) => s"($a $op $b)"
+
+      case NilL(t)          => s"Nil"
+      case ConsL(t, hd, tl) => s"(Cons $hd $tl)"
 
     def flattenLams: (List[(Int, Ty)], Option[Ty], Tm) =
       def go(t: Tm): (List[(Int, Ty)], Option[Ty], Tm) = t match
@@ -103,6 +109,8 @@ object Syntax:
       case If(_, c, a, b) => c.freeVars ++ a.freeVars ++ b.freeVars
 
       case Binop(_, a, b) => a.freeVars ++ b.freeVars
+
+      case ConsL(_, hd, tl) => hd.freeVars ++ tl.freeVars
 
       case _ => Nil
 
@@ -192,6 +200,9 @@ object Syntax:
 
       case Binop(op, a, b) =>
         Binop(op, a.subst(sub, scope), b.subst(sub, scope))
+
+      case ConsL(t, hd, tl) =>
+        ConsL(t, hd.subst(sub, scope), tl.subst(sub, scope))
 
       case _ => this
   export Tm.*

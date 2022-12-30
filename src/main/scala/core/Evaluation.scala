@@ -163,7 +163,9 @@ object Evaluation:
     case IntLit(v)       => VIntLit(v)
     case Binop(op, a, b) => vbinop(op, eval(a), eval(b))
 
-    case ListTy(t) => VList(eval(t))
+    case ListTy(t)        => VList(eval(t))
+    case NilL(t)          => VNil(eval(t))
+    case ConsL(t, hd, tl) => VCons(eval(t), eval(hd), eval(tl))
 
     case Meta(id)              => vmeta(id)
     case InsertedMeta(id, bds) => vappbds(vmeta(id), bds)
@@ -255,5 +257,8 @@ object Evaluation:
       case VIntLit(v) => IntLit(v)
 
       case VList(t) => ListTy(quote(t, unfold))
+      case VNil(t)  => NilL(quote(t, unfold))
+      case VCons(t, hd, tl) =>
+        ConsL(quote(t, unfold), quote(hd, unfold), quote(tl, unfold))
 
   def nf(tm: Tm)(implicit env: Env = Nil): Tm = quote(eval(tm))(mkLvl(env.size))

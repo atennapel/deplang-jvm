@@ -42,29 +42,31 @@ object Pretty:
   private def prettyParen(tm: Tm, app: Boolean = false)(implicit
       ns: List[Name]
   ): String = tm match
-    case Local(_)            => pretty(tm)
-    case Global(_)           => pretty(tm)
-    case VF                  => pretty(tm)
-    case VFVal               => pretty(tm)
-    case VFFun               => pretty(tm)
-    case U0                  => pretty(tm)
-    case U1                  => pretty(tm)
-    case App(_, _, _) if app => pretty(tm)
-    case ListTy(t) if app    => pretty(tm)
-    case Lift(_, _)          => pretty(tm)
-    case Quote(_)            => pretty(tm)
-    case Splice(_)           => pretty(tm)
-    case Bool                => pretty(tm)
-    case True                => pretty(tm)
-    case False               => pretty(tm)
-    case IntTy               => pretty(tm)
-    case IntLit(v)           => pretty(tm)
-    case Pair(_, _)          => pretty(tm)
-    case Proj(_, _)          => pretty(tm)
-    case Meta(_)             => pretty(tm)
-    case InsertedMeta(_, _)  => pretty(tm)
-    case Wk(t)               => prettyParen(t, app)(ns.tail)
-    case _                   => s"(${pretty(tm)})"
+    case Local(_)                => pretty(tm)
+    case Global(_)               => pretty(tm)
+    case VF                      => pretty(tm)
+    case VFVal                   => pretty(tm)
+    case VFFun                   => pretty(tm)
+    case U0                      => pretty(tm)
+    case U1                      => pretty(tm)
+    case App(_, _, _) if app     => pretty(tm)
+    case ListTy(t) if app        => pretty(tm)
+    case NilL(_)                 => pretty(tm)
+    case ConsL(t, hd, tl) if app => pretty(tm)
+    case Lift(_, _)              => pretty(tm)
+    case Quote(_)                => pretty(tm)
+    case Splice(_)               => pretty(tm)
+    case Bool                    => pretty(tm)
+    case True                    => pretty(tm)
+    case False                   => pretty(tm)
+    case IntTy                   => pretty(tm)
+    case IntLit(v)               => pretty(tm)
+    case Pair(_, _)              => pretty(tm)
+    case Proj(_, _)              => pretty(tm)
+    case Meta(_)                 => pretty(tm)
+    case InsertedMeta(_, _)      => pretty(tm)
+    case Wk(t)                   => prettyParen(t, app)(ns.tail)
+    case _                       => s"(${pretty(tm)})"
 
   private def flattenPair(tm: Tm): List[Tm] = tm match
     case Pair(fst, snd) => fst :: flattenPair(snd)
@@ -118,7 +120,9 @@ object Pretty:
     case IntLit(v)       => s"$v"
     case Binop(op, a, b) => s"$a $op $b"
 
-    case ListTy(t) => s"List ${prettyParen(t)}"
+    case ListTy(t)        => s"List ${prettyParen(t)}"
+    case NilL(t)          => s"Nil"
+    case ConsL(t, hd, tl) => s"Cons $hd $tl"
 
     case Meta(id)            => s"?$id"
     case InsertedMeta(id, _) => s"?$id"

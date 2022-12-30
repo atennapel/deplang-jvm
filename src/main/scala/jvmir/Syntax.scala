@@ -40,6 +40,9 @@ object Syntax:
     case IntLit(value: Int)
     case Binop(op: Op, left: Tm, right: Tm)
 
+    case NilL(ty: Ty)
+    case ConsL(ty: Ty, head: Tm, tail: Tm)
+
     case Box(ty: Ty, tm: Tm)
     case Unbox(ty: Ty, tm: Tm)
 
@@ -62,6 +65,9 @@ object Syntax:
 
       case IntLit(n)       => s"$n"
       case Binop(op, a, b) => s"($a $op $b)"
+
+      case NilL(_)          => "Nil"
+      case ConsL(_, hd, tl) => s"(Cons $hd $tl)"
 
       case Box(ty, tm)   => s"(box {$ty} $tm)"
       case Unbox(ty, tm) => s"(unbox {$ty} $tm)"
