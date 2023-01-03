@@ -133,7 +133,7 @@ object Staging:
 
     case Wk(t) => eval1(t)(env.tail)
 
-    case _ => impossible()
+    case _ => println(t); impossible()
 
   private def vvar0(ix: Ix)(implicit env: Env): Val0 =
     def go(env: Env, i: Int): Val0 = (env, i) match

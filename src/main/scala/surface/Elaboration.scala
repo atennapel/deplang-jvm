@@ -518,6 +518,11 @@ object Elaboration:
       inferValue(tm, ty, u)(
         Ctx.empty((0, 0))
       ) // TODO: use source position
+    val ums = unsolvedMetas()
+    if ums.nonEmpty then
+      throw ElaborateError(
+        s"unsolved metas: ${unsolvedMetas().map(x => s"?$x").mkString(", ")}"
+      )
     (zonk(etm)(lvl0, Nil), zonk(ety)(lvl0, Nil))
 
   def elaborate(d: S.Def): Def =

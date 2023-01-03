@@ -1,0 +1,45 @@
+(::) : {A : U0 Val} -> A -> List A -> List A =
+  \hd tl. Cons hd tl;
+
+(++) : {A : U0 Val} -> List A -> List A -> List A =
+  \a b. `(fix (go l. case l b (hd tl. hd :: go tl)) a);
+
+head : {A : U0 Val} -> A -> List A -> A =
+  \d l. case l d (hd _. hd);
+
+singleton : {A : U0 Val} -> A -> List A = \x. x :: Nil;
+
+Writer : U0 Val -> U0 Val -> U0 Val = \O A. List O ** A;
+
+return : {O A : U0 Val} -> A -> Writer O A = \x. (Nil, x);
+
+map : {O A B : U0 Val} -> (A -> B) -> Writer O A -> Writer O B =
+  \f p. `(($p.1, f `($p.2)));
+
+bind : {O A B : U0 Val} -> Writer O A -> (A -> Writer O B) -> Writer O B =
+  \{O} {A} {B} a f. let res = f ($a).2 in ((++) {O} ($a).1 $res.1, $res.2);
+
+write : {O A : U0 Val} -> O -> Writer O Int = \o. (singleton o, 0);
+
+program : Int -> Writer Int Int := \x.
+  bind (return x) \n.
+  bind {Int} {Int} {Int} (write {Int} {Int} 42) \_.
+  return n;
+
+fib : Int -> Writer Int (Int ** Int) = \n.
+  `(let fibR : (Int ** Int) -> Writer Int (Int ** Int) :=
+      fix (go n. \acc.
+        if n <= 0 then
+          return acc
+        else
+          let a ::= acc.1 in
+          let b ::= acc.2 in
+          bind {Int} {Int} {Int ** Int} (write {Int} {Int ** Int} a) \_.
+          go (n - 1) (b, a + b)) n in
+    fibR (1, 1));
+
+main : Int -> Int := \_.
+  let res ::= fib 3 in
+  let a ::= res.1 in
+  let b ::= res.2 in
+  head {Int} 0 a;
