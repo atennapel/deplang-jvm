@@ -1,3 +1,5 @@
+ARCHIVED: see https://github.com/atennapel/tynka for a new implementation of this idea
+
 Experimental implementation of a "dysfunctional" programming language.
 The idea originates from this presentation by Andras Kovacs: https://www.youtube.com/watch?v=ai4vU1Naopk .
 
